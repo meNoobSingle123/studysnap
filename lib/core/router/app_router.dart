@@ -6,6 +6,8 @@ import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
 import '../../features/security/presentation/pages/app_lock_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
+import '../../features/timetable/presentation/pages/gpa_page.dart';
+import '../../features/timetable/presentation/pages/slot_detail_page.dart';
 import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../l10n/strings.dart';
 import '../security/auth_lock_listenable.dart';
@@ -91,6 +93,19 @@ abstract final class AppRouter {
         builder: (context, state) {
           final noteId = state.uri.queryParameters['noteId'];
           return CanvasPage(noteId: noteId);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.gpaProjection,
+        builder: (context, state) => const GpaPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.slotDetail,
+        builder: (context, state) {
+          final slotId = state.pathParameters['id'] ?? '';
+          return SlotDetailPage(slotId: slotId);
         },
       ),
     ],

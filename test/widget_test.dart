@@ -8,10 +8,13 @@ import 'package:nhom_7/core/security/bloc/auth_lock_event.dart';
 import 'package:nhom_7/features/security/presentation/pages/app_lock_page.dart';
 import 'package:nhom_7/main.dart';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 void main() {
   setUp(() async {
+    FlutterSecureStorage.setMockInitialValues({});
     AuthLockListenable.instance.updateLockState(true);
-    await configureDependencies();
+    await configureDependencies(isTest: true);
   });
 
   tearDown(() async {

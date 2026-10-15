@@ -32,6 +32,17 @@ abstract final class AppStrings {
   static const String savedStatus = 'Đã lưu';
   static const String pinnedSlot = 'Ca học';
   static const String pinnedSubject = 'Môn học';
+  static const String searchNotesHint = 'Tìm kiếm theo tiêu đề, nội dung...';
+  static const String allSubjects = 'Tất cả môn';
+  static const String filterByDate = 'Lọc theo ngày';
+  static const String resetFilters = 'Đặt lại bộ lọc';
+  static const String noMatchingNotes = 'Không tìm thấy ghi chú nào phù hợp.';
+  static const String sortNewest = 'Mới nhất';
+  static const String sortOldest = 'Cũ nhất';
+  static const String sortTitleAz = 'Tên (A-Z)';
+  static const String deleteNoteConfirmTitle = 'Xóa ghi chú?';
+  static const String deleteNoteConfirmMessage = 'Ghi chú này sẽ bị xóa khỏi danh sách. Bạn có chắc chắn muốn xóa?';
+  static const String untitledNote = 'Ghi chú không tiêu đề';
 
   // Canvas Drawing (S07)
   static const String canvasPageTitle = 'Bản vẽ ghi chú';
@@ -85,6 +96,26 @@ abstract final class AppStrings {
   static const String toolsTitle = 'Công cụ & Cài đặt';
   static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
   static const String appSettings = 'Cài đặt hệ thống';
+
+  // Timetable Feature (S02, S03, S04)
+  static const String timetableTitle = 'Thời khóa biểu';
+  static const String nextClassCountdown = 'Ca học tiếp theo';
+  static const String noUpcomingClass = 'Không có ca học nào sắp tới hôm nay';
+  static const String noClassToday = 'Hôm nay không có ca học nào';
+  static const String gpaProjectionTitle = 'Dự phóng GPA';
+  static const String currentGpa = 'GPA hiện tại';
+  static const String completedCredits = 'Tín chỉ đã tích lũy';
+  static const String remainingCredits = 'Tín chỉ còn lại';
+  static const String targetGpa = 'GPA mục tiêu';
+  static const String calculate = 'Tính toán';
+  static const String gpaResult = 'Kết quả dự phóng';
+  static const String slotDetails = 'Chi tiết ca học';
+  static const String room = 'Phòng';
+  static const String building = 'Tòa nhà';
+  static const String credits = 'Tín chỉ';
+  static const String reminderLead = 'Nhắc nhở trước';
+  static const String getDirections = 'Chỉ đường';
+  static const String createNoteForSlot = 'Tạo ghi chú cho ca này';
 
   // State Messages
   static const String loading = 'Đang tải...';

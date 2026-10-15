@@ -12,6 +12,12 @@ abstract final class Routes {
   static String canvasRoute({String? noteId}) =>
       noteId != null ? '/notes/canvas?noteId=$noteId' : '/notes/canvas';
 
+  // Timetable Feature (Huy)
+  static const String gpaProjection = '/timetable/gpa';
+  static const String slotDetail = '/timetable/slot/:id';
+  static String slotDetailRoute(String id) => '/timetable/slot/$id';
+
   // Security Feature (S01)
   static const String lock = '/lock';
 }
+
