@@ -55,3 +55,7 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 skills-lock.json
+
+node_modules/
+backend/node_modules/
+
