@@ -6,6 +6,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
 import 'package:nhom_7/features/notes/domain/utils/timestamp_helper.dart';
+import '../../../ocr/ocr_scanner_page.dart';
 import '../bloc/note_editor_bloc.dart';
 import '../bloc/note_editor_event.dart';
 import '../bloc/note_editor_state.dart';
@@ -172,6 +173,37 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                 ],
               ),
               actions: [
+                // Nút OCR: chèn chữ từ ảnh vào vị trí con trỏ (CĐ 12 / FR-14)
+                IconButton(
+                  tooltip: 'Nhận diện chữ từ ảnh (OCR)',
+                  icon: const Icon(Icons.document_scanner_outlined),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OcrScannerPage(
+                          onInsert: (text) {
+                            final ctrl = _bodyController;
+                            final old = ctrl.text;
+                            final sel = ctrl.selection;
+                            final pos = sel.isValid ? sel.start : old.length;
+                            final newText = old.substring(0, pos) +
+                                text +
+                                old.substring(pos);
+                            ctrl.value = TextEditingValue(
+                              text: newText,
+                              selection:
+                                  TextSelection.collapsed(offset: pos + text.length),
+                            );
+                            context
+                                .read<NoteEditorBloc>()
+                                .add(UpdateContent(bodyText: newText));
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 if (isSaving)
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0),

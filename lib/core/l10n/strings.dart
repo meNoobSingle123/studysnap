@@ -84,6 +84,7 @@ abstract final class AppStrings {
   // Tools & Settings Feature (S10, S13)
   static const String toolsTitle = 'Công cụ & Cài đặt';
   static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
+  static const String ocrScanner = 'Nhận diện chữ từ ảnh (OCR)';
   static const String appSettings = 'Cài đặt hệ thống';
 
   // State Messages
