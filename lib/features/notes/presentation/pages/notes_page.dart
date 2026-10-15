@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../data/repositories/in_memory_note_repository.dart';
 import '../../domain/entities/lecture_note.dart';
 import '../../domain/repositories/note_repository.dart';
 

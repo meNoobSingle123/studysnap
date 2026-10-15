@@ -140,7 +140,7 @@ void main() {
                       builder: (_) => CanvasPage(
                         noteId: 'note-1',
                         originalImageSize: const Size(400, 400),
-                        onSave: (_, __) async {},
+                        onSave: (strokes, bytes) async {},
                       ),
                     ),
                   );
