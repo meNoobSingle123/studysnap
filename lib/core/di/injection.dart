@@ -7,6 +7,8 @@ import 'package:local_auth/local_auth.dart';
 
 import '../../features/export/domain/services/pdf_generator_service.dart';
 import '../../features/export/presentation/bloc/pdf_export_bloc.dart';
+import '../../features/notifications/domain/services/notification_service.dart';
+import '../../features/notifications/presentation/bloc/notification_bloc.dart';
 import '../../features/notes/data/repositories/in_memory_note_repository.dart';
 import '../../features/notes/domain/repositories/note_repository.dart';
 import '../../features/notes/domain/usecases/delete_note_usecase.dart';
@@ -156,4 +158,16 @@ Future<void> configureDependencies({bool isTest = false}) async {
   getIt.registerLazySingleton<TimetableRemoteDataSource>(
     () => TimetableRemoteDataSourceImpl(dioClient: getIt<DioClient>()),
   );
+
+  // Notifications Module (Huy - CĐ 7)
+  getIt.registerLazySingleton<NotificationService>(
+    () => NotificationService(),
+  );
+  getIt.registerFactory<NotificationBloc>(
+    () => NotificationBloc(
+      notificationService: getIt<NotificationService>(),
+      timetableRepository: getIt<TimetableRepository>(),
+    ),
+  );
 }
+

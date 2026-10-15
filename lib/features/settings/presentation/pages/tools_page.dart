@@ -38,6 +38,16 @@ class ToolsPage extends StatelessWidget {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
+              leading: const Icon(Icons.notifications_active_rounded),
+              title: const Text(AppStrings.notificationTitle),
+              subtitle: const Text('Lên lịch nhắc tự động 15 phút trước ca học (CĐ 7)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.notifications),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
               leading: const Icon(Icons.map_outlined),
               title: const Text(AppStrings.mapNavigation),
               trailing: const Icon(Icons.chevron_right),

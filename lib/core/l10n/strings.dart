@@ -172,7 +172,26 @@ abstract final class AppStrings {
   static const String notePdfHeader = 'PHIẾU GHI CHÚ BÀI GIẢNG';
   static const String institutionName = 'ĐẠI HỌC KHOA HỌC TỰ NHIÊN - ĐHQG-HCM';
 
+  // Notifications Feature (Huy - CĐ 7)
+  static const String notificationTitle = 'Thông báo & Nhắc giờ';
+  static const String notificationSettingsTitle = 'Cài đặt Nhắc giờ học (CĐ 7)';
+  static const String notificationPermissionGranted = 'Đã cấp quyền thông báo';
+  static const String notificationPermissionDenied = 'Chưa cấp quyền thông báo';
+  static const String exactAlarmPermissionTitle = 'Quyền báo giờ chính xác (Exact Alarm)';
+  static const String scheduleRollingReminders = 'Lên lịch nhắc tự động 7 ngày tới';
+  static const String scheduleSuccessMessage = 'Đã lên lịch thành công cho các ca học sắp tới';
+  static const String testNotificationTitle = 'Thử nghiệm thông báo tức thì';
+  static const String testNotificationBody = 'StudySnap: Ca học tiếp theo sẽ bắt đầu sau 15 phút tại phòng H2.304!';
+  static const String leadTimeTitle = 'Thời gian nhắc trước giờ học';
+  static const String minutesLead = 'phút';
+  static const String pendingReminders = 'Thông báo đang chờ phát';
+  static const String noPendingReminders = 'Không có thông báo nào đang chờ';
+  static const String cancelAllReminders = 'Hủy toàn bộ lịch nhắc';
+  static const String reminderChannelName = 'Nhắc nhở lịch học & lịch thi';
+  static const String reminderChannelDesc = 'Thông báo tự động nhắc trước giờ vào ca học hoặc ca thi';
+
   // Error Messages
+
   static const String errorNetwork = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền internet.';
   static const String errorServer = 'Hệ thống máy chủ đang bận. Vui lòng thử lại sau.';
   static const String errorStorage = 'Lỗi truy xuất cơ sở dữ liệu cục bộ.';

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/export/domain/models/pdf_export_models.dart';
 import '../../features/export/presentation/pages/pdf_export_page.dart';
+import '../../features/notifications/presentation/pages/notification_settings_page.dart';
 import '../../features/notes/presentation/pages/canvas_page.dart';
 import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
@@ -128,7 +129,13 @@ abstract final class AppRouter {
           );
         },
       ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.notifications,
+        builder: (context, state) => const NotificationSettingsPage(),
+      ),
     ],
+
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text(AppStrings.appName)),
       body: const Center(

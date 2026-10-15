@@ -27,6 +27,10 @@ abstract final class Routes {
   static const String pdfExport = '/export/pdf';
   static String pdfExportRoute({String? noteId}) =>
       noteId != null ? '/export/pdf?noteId=$noteId' : '/export/pdf';
+
+  // Notifications Feature (Huy - CĐ 7)
+  static const String notifications = '/settings/notifications';
 }
+
 
 
