@@ -17,7 +17,11 @@ abstract final class AppStrings {
   static const String edit = 'Chỉnh sửa';
   static const String retry = 'Thử lại';
   static const String close = 'Đóng';
-  static const String search = 'Tìm kiếm';
+  // Timetable Feature (S02, CĐ 2, Chương 5)
+  static const String syncTimetable = 'Đồng bộ';
+  static const String syncingTimetable = 'Đang đồng bộ lịch học...';
+  static const String syncTimetableSuccess = 'Đồng bộ lịch học thành công!';
+  static const String syncTimetableFailed = 'Đồng bộ lịch học thất bại. Vui lòng thử lại.';
 
   // Notes Feature (S05, S06)
   static const String noteEditorTitle = 'Soạn ghi chú';

@@ -8,6 +8,7 @@ import '../../features/notes/domain/usecases/get_note_by_id_usecase.dart';
 import '../../features/notes/domain/usecases/save_note_usecase.dart';
 import '../../features/notes/presentation/bloc/canvas_bloc.dart';
 import '../../features/notes/presentation/bloc/note_editor_bloc.dart';
+import '../../features/timetable/data/datasources/timetable_remote_data_source.dart';
 import '../network/dio_client.dart';
 import '../security/bloc/auth_lock_bloc.dart';
 import '../security/key_storage_service.dart';
@@ -49,4 +50,9 @@ Future<void> configureDependencies() async {
     ),
   );
   getIt.registerFactory<CanvasBloc>(() => CanvasBloc());
+
+  // Timetable Module (Remote DataSource)
+  getIt.registerLazySingleton<TimetableRemoteDataSource>(
+    () => TimetableRemoteDataSourceImpl(dioClient: getIt<DioClient>()),
+  );
 }
