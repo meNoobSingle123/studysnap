@@ -124,8 +124,6 @@ void main() {
       // Body text should now contain [00:00] (initial position)
       expect(find.textContaining('[00:00]'), findsWidgets);
     });
-<<<<<<< HEAD
-=======
 
     testWidgets('tapping save button saves note with updated title and body into repository',
         (tester) async {
@@ -188,6 +186,5 @@ void main() {
       expect(savedNote!.title, 'Tieu de moi');
       expect(savedNote.bodyText, 'Noi dung moi');
     });
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   });
 }

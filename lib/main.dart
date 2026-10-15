@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 import 'package:connectivity_plus/connectivity_plus.dart';
-=======
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 import 'package:flutter/material.dart';
 
 import 'core/di/injection.dart';
@@ -27,7 +24,6 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       routerConfig: AppRouter.router,
-<<<<<<< HEAD
       // Banner mất mạng xuất hiện trên mọi màn hình (CĐ 5)
       builder: (context, child) => ConnectivityBanner(child: child!),
     );
@@ -82,8 +78,6 @@ class ConnectivityBanner extends StatelessWidget {
           Expanded(child: child),
         ]);
       },
-=======
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
     );
   }
 }

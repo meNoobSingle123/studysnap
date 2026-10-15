@@ -1,17 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-<<<<<<< HEAD
-import 'package:uuid/uuid.dart';
-
-import '../../../../core/l10n/strings.dart';
-import '../../../../core/router/routes.dart';
-
-class NotesPage extends StatelessWidget {
-  const NotesPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-=======
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
@@ -41,7 +29,7 @@ class _NotesPageState extends State<NotesPage> {
     _repository = widget.repository ??
         (getIt.isRegistered<NoteRepository>()
             ? getIt<NoteRepository>()
-            : getIt<NoteRepository>());
+            : InMemoryNoteRepository());
     _loadNotes();
   }
 
@@ -70,22 +58,10 @@ class _NotesPageState extends State<NotesPage> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.notesTab),
       ),
-<<<<<<< HEAD
-      body: const Center(
-        child: Text(AppStrings.emptyNotesList),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          final newNoteId = const Uuid().v4();
-          context.push(Routes.noteEdit(newNoteId));
-        },
-        icon: const Icon(Icons.edit_note),
-=======
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _notes.isEmpty
@@ -225,7 +201,6 @@ class _NotesPageState extends State<NotesPage> {
           _openNoteEditor(newNoteId);
         },
         icon: const Icon(Icons.add),
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
         label: const Text(AppStrings.createNote),
       ),
     );

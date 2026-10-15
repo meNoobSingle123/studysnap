@@ -17,15 +17,13 @@ abstract final class AppStrings {
   static const String edit = 'Chỉnh sửa';
   static const String retry = 'Thử lại';
   static const String close = 'Đóng';
-<<<<<<< HEAD
   static const String search = 'Tìm kiếm';
-=======
+
   // Timetable Feature (S02, CĐ 2, Chương 5)
   static const String syncTimetable = 'Đồng bộ';
   static const String syncingTimetable = 'Đang đồng bộ lịch học...';
   static const String syncTimetableSuccess = 'Đồng bộ lịch học thành công!';
   static const String syncTimetableFailed = 'Đồng bộ lịch học thất bại. Vui lòng thử lại.';
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
   // Notes Feature (S05, S06)
   static const String noteEditorTitle = 'Soạn ghi chú';
@@ -88,22 +86,16 @@ abstract final class AppStrings {
   static const String biometricsSuccess = 'Mở khóa thành công';
   static const String appLocked = 'Ứng dụng đang khóa';
   static const String appUnlocked = 'Ứng dụng đã mở khóa';
-<<<<<<< HEAD
-=======
   static const String biometricLockTitle = 'Khóa ứng dụng bằng sinh trắc học';
   static const String biometricLockSubtitle = 'Yêu cầu vân tay hoặc mã PIN khi mở ứng dụng';
   static const String biometricLockEnabledSuccess = 'Đã bật khóa sinh trắc học';
   static const String biometricLockDisabledSuccess = 'Đã tắt khóa sinh trắc học';
   static const String biometricAuthRequiredToEnable = 'Xác thực để bật khóa ứng dụng';
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
   // Tools & Settings Feature (S10, S13)
   static const String toolsTitle = 'Công cụ & Cài đặt';
   static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
-<<<<<<< HEAD
   static const String ocrScanner = 'Nhận diện chữ từ ảnh (OCR)';
-=======
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   static const String appSettings = 'Cài đặt hệ thống';
 
   // State Messages

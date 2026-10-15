@@ -8,10 +8,7 @@ import '../../features/security/presentation/pages/app_lock_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
 import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../l10n/strings.dart';
-<<<<<<< HEAD
 import '../security/auth_lock_listenable.dart';
-=======
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 import 'routes.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -22,13 +19,13 @@ abstract final class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: Routes.timetable,
-<<<<<<< HEAD
     refreshListenable: AuthLockListenable.instance,
     redirect: (context, state) {
       final isLockLocation = state.matchedLocation == Routes.lock;
+      final isLockEnabled = AuthLockListenable.instance.isLockEnabled;
       final isLocked = AuthLockListenable.instance.isLocked;
 
-      if (isLocked) {
+      if (isLockEnabled && isLocked) {
         return isLockLocation ? null : Routes.lock;
       }
 
@@ -36,12 +33,6 @@ abstract final class AppRouter {
         return Routes.timetable;
       }
 
-=======
-    redirect: (context, state) {
-      if (state.matchedLocation == Routes.home) {
-        return Routes.timetable;
-      }
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
       return null;
     },
     routes: [

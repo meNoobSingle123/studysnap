@@ -1,20 +1,5 @@
 import 'package:flutter/material.dart';
 
-<<<<<<< HEAD
-import '../../../../core/l10n/strings.dart';
-
-class TimetablePage extends StatelessWidget {
-  const TimetablePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.timetableTab),
-      ),
-      body: const Center(
-        child: Text(AppStrings.timetableTab),
-=======
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/l10n/strings.dart';
@@ -183,7 +168,6 @@ class _TimetablePageState extends State<TimetablePage> {
             ),
           ],
         ),
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
       ),
     );
   }

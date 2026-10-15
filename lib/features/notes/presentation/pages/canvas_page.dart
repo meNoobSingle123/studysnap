@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 
-import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../domain/entities/stroke.dart';
 import '../bloc/canvas_bloc.dart';
@@ -13,12 +13,12 @@ import '../utils/canvas_image_exporter.dart';
 import '../widgets/canvas/canvas_drawing_board.dart';
 import '../widgets/canvas/canvas_toolbar.dart';
 
-/// Fullscreen canvas page (S07) combining [CanvasDrawingBoard] with
-/// [CanvasToolbar] and raster export via [CanvasImageExporter].
+/// Màn hình vẽ và chú thích trên canvas S07 theo đặc tả CĐ 7 (mục 5.2, 5.3, 6.2).
+/// Hỗ trợ vẽ nét bút/highlight, tẩy xóa, undo/redo, xuất ảnh độ phân giải gốc.
 class CanvasPage extends StatelessWidget {
   final String? noteId;
   final Size originalImageSize;
-  final Widget? backgroundImage;
+  final Uint8List? backgroundImage;
   final Future<void> Function(List<Stroke> strokes, Uint8List? flatBytes)? onSave;
 
   const CanvasPage({
@@ -32,7 +32,13 @@ class CanvasPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => getIt<CanvasBloc>(),
+      create: (context) {
+        final getIt = GetIt.instance;
+        if (getIt.isRegistered<CanvasBloc>()) {
+          return getIt<CanvasBloc>();
+        }
+        return CanvasBloc();
+      },
       child: _CanvasPageView(
         noteId: noteId,
         originalImageSize: originalImageSize,
@@ -46,7 +52,7 @@ class CanvasPage extends StatelessWidget {
 class _CanvasPageView extends StatefulWidget {
   final String? noteId;
   final Size originalImageSize;
-  final Widget? backgroundImage;
+  final Uint8List? backgroundImage;
   final Future<void> Function(List<Stroke> strokes, Uint8List? flatBytes)? onSave;
 
   const _CanvasPageView({
@@ -62,10 +68,7 @@ class _CanvasPageView extends StatefulWidget {
 
 class _CanvasPageViewState extends State<_CanvasPageView> {
   bool _isSaving = false;
-<<<<<<< HEAD
-=======
   bool _hasUnsavedChanges = false;
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
   Future<void> _handleSave(CanvasState state) async {
     setState(() => _isSaving = true);
@@ -80,12 +83,9 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
       }
 
       if (mounted) {
-<<<<<<< HEAD
-=======
         setState(() {
           _hasUnsavedChanges = false;
         });
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.canvasExportSuccess)),
         );
@@ -98,11 +98,7 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
   }
 
   Future<bool> _confirmDiscard(CanvasState state) async {
-<<<<<<< HEAD
-    if (state.strokes.isEmpty) return true;
-=======
     if (!_hasUnsavedChanges) return true;
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -129,12 +125,6 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
   Widget build(BuildContext context) {
     final bloc = context.read<CanvasBloc>();
 
-<<<<<<< HEAD
-    return BlocBuilder<CanvasBloc, CanvasState>(
-      builder: (context, state) {
-        return PopScope(
-          canPop: state.strokes.isEmpty,
-=======
     return BlocConsumer<CanvasBloc, CanvasState>(
       listenWhen: (prev, curr) => prev.strokes != curr.strokes,
       listener: (context, state) {
@@ -145,7 +135,6 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
       builder: (context, state) {
         return PopScope(
           canPop: !_hasUnsavedChanges,
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
           onPopInvokedWithResult: (didPop, _) async {
             if (didPop) return;
             final canLeave = await _confirmDiscard(state);
@@ -156,10 +145,7 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
           child: Scaffold(
             appBar: AppBar(
               title: const Text(AppStrings.canvasPageTitle),
-<<<<<<< HEAD
-=======
               leading: const BackButton(),
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
               actions: [
                 if (_isSaving)
                   const Padding(
@@ -191,11 +177,6 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                     activeTool: state.selectedTool,
                     activeColor: Color(state.selectedColor),
                     activeWidthScene: state.strokeWidth,
-<<<<<<< HEAD
-                    onStrokeAdded: (stroke) => bloc.add(AddStrokeEvent(stroke)),
-                    onUndo: () => bloc.add(const UndoEvent()),
-                    onRedo: () => bloc.add(const RedoEvent()),
-=======
                     onStrokeAdded: (stroke) {
                       setState(() => _hasUnsavedChanges = true);
                       bloc.add(AddStrokeEvent(stroke));
@@ -208,7 +189,6 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                       setState(() => _hasUnsavedChanges = true);
                       bloc.add(const RedoEvent());
                     },
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
                   ),
                 ),
 

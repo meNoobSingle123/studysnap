@@ -1,70 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../../core/l10n/strings.dart';
+import '../../../../core/l10n/strings.dart';
 import '../../../domain/entities/stroke.dart';
-import '../../../domain/utils/stroke_math.dart';
+import '../../../domain/utils/canvas_math_util.dart';
 import 'active_stroke_painter.dart';
 import 'completed_strokes_painter.dart';
 
-/// Interaction mode for the canvas board.
+/// Interaction mode for [CanvasDrawingBoard].
 enum CanvasMode {
-  /// Pan & zoom mode — InteractiveViewer is active, drawing is locked.
+  /// InteractiveViewer handles pan & zoom gestures.
   view,
 
-  /// Draw mode — InteractiveViewer is locked, GestureDetector captures input.
+  /// Raw pointer gestures are captured to draw strokes.
   draw,
 }
 
-/// The main canvas widget that layers:
-/// 1. An optional background image.
-/// 2. A [RepaintBoundary]-isolated [CompletedStrokesPainter] layer.
-/// 3. A [RepaintBoundary]-isolated [ActiveStrokePainter] layer.
+/// Canvas drawing board with dual-layer rendering (completed strokes vs. active stroke)
+/// and dual interaction modes (View mode vs. Draw mode).
 ///
-/// Toggle between [CanvasMode.view] and [CanvasMode.draw] via the floating
-/// action button. In view mode the [InteractiveViewer] handles pan/zoom up to
-/// 5× (500%). In draw mode the viewer is locked and [GestureDetector] captures
-/// all pointer events.
+/// Implements requirements from:
+/// - CĐ 7 (Drawing Canvas)
+/// - rules/03-canvas-drawing.md
+/// - Architectural decision: RepaintBoundary isolation for 60fps drawing
 class CanvasDrawingBoard extends StatefulWidget {
-  /// Completed strokes to render on the lower paint layer.
+  /// All finalized strokes to be rendered on Layer 1.
   final List<Stroke> strokes;
 
-  /// Original image dimensions — used for coordinate normalization.
-  /// Pass [Size.zero] when no image is loaded yet.
+  /// Logical size of the canvas coordinate space (e.g. 1080×1920).
   final Size originalImageSize;
 
-  /// Optional background image widget (e.g. [Image.file]).
+  /// Optional background widget (e.g. captured camera image).
   final Widget? backgroundImage;
 
-  /// Called when the user finishes drawing a new stroke.
-  final void Function(Stroke stroke)? onStrokeAdded;
-
-  /// Called when undo is triggered.
-  final void Function()? onUndo;
-
-  /// Called when redo is triggered.
-  final void Function()? onRedo;
-
-  /// Active drawing tool.
+  /// Currently active drawing tool.
   final StrokeTool activeTool;
 
-  /// Active pen color.
+  /// Color used for new strokes.
   final Color activeColor;
 
-  /// Active pen width in logical pixels (scene space).
+  /// Width in scene pixels for new strokes.
   final double activeWidthScene;
+
+  /// Callback fired when a stroke is completed and normalized.
+  final ValueChanged<Stroke>? onStrokeAdded;
+
+  /// Callback fired when undo is tapped.
+  final VoidCallback? onUndo;
+
+  /// Callback fired when redo is tapped.
+  final VoidCallback? onRedo;
 
   const CanvasDrawingBoard({
     super.key,
     required this.strokes,
     required this.originalImageSize,
     this.backgroundImage,
-    this.onStrokeAdded,
-    this.onUndo,
-    this.onRedo,
     this.activeTool = StrokeTool.pen,
     this.activeColor = Colors.black,
     this.activeWidthScene = 4.0,
+    this.onStrokeAdded,
+    this.onUndo,
+    this.onRedo,
   });
 
   @override
@@ -76,11 +73,8 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
   CanvasMode _mode = CanvasMode.view;
   final _transformationController = TransformationController();
   final _uuid = const Uuid();
-<<<<<<< HEAD
-=======
   final GlobalKey _canvasContentKey = GlobalKey();
   StrokeSize? _lastDisplaySize;
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
   /// Points of the stroke currently being drawn (in display/paint pixels).
   final ValueNotifier<List<Offset>> _activePoints = ValueNotifier([]);
@@ -106,20 +100,12 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     if (_mode != CanvasMode.draw) return;
     _activePoints.value = [];
     _scenePointsBuffer.clear();
-<<<<<<< HEAD
-    _addPoint(details.localPosition);
-=======
     _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     if (_mode != CanvasMode.draw) return;
-<<<<<<< HEAD
-    _addPoint(details.localPosition);
-=======
     _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   }
 
   void _onPanEnd(DragEndDetails _) {
@@ -127,22 +113,6 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     _finalizeStroke();
   }
 
-<<<<<<< HEAD
-  /// Converts [localPos] (touch space) → scene space → adds to buffers.
-  void _addPoint(Offset localPos) {
-    // Step 1: touch → scene (accounting for zoom / pan)
-    final sceneOffset = _transformationController.toScene(localPos);
-    final scenePoint = StrokePoint(sceneOffset.dx, sceneOffset.dy);
-
-    // Step 2: accumulate scene points for normalization
-    _scenePointsBuffer.add(scenePoint);
-
-    // Step 3: accumulate display-space points for the active painter (no
-    //         normalization needed — painter uses scene coords directly since
-    //         it sits inside the InteractiveViewer's coordinate space).
-    final current = List<Offset>.from(_activePoints.value)
-      ..add(Offset(sceneOffset.dx, sceneOffset.dy));
-=======
   /// Converts touch position to scene space and records point.
   /// Uses [RenderBox.globalToLocal] from [_canvasContentKey] to eliminate any
   /// touch offset or screen offset, falling back to [_transformationController.toScene].
@@ -159,16 +129,11 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     _scenePointsBuffer.add(scenePoint);
 
     final current = List<Offset>.from(_activePoints.value)..add(sceneOffset);
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
     _activePoints.value = current;
   }
 
   /// Normalizes, simplifies, and emits the completed stroke.
   void _finalizeStroke() {
-<<<<<<< HEAD
-    final imgSize = widget.originalImageSize;
-    final domainImageSize = StrokeSize(imgSize.width, imgSize.height);
-=======
     final renderBox = _canvasContentKey.currentContext?.findRenderObject() as RenderBox?;
     final targetSize = (renderBox != null && renderBox.hasSize && renderBox.size.width > 0 && renderBox.size.height > 0)
         ? StrokeSize(renderBox.size.width, renderBox.size.height)
@@ -176,18 +141,12 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
             (widget.originalImageSize.width > 0 && widget.originalImageSize.height > 0
                 ? StrokeSize(widget.originalImageSize.width, widget.originalImageSize.height)
                 : const StrokeSize(1080, 1920)));
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
     // Apply simplification to remove redundant close points (< 1.5 px)
     final simplified = simplifyPoints(_scenePointsBuffer, threshold: 1.5);
 
-<<<<<<< HEAD
-    // Normalize to [0, 1]
-    final flatNorm = normalizePoints(simplified, domainImageSize);
-=======
     // Normalize to [0, 1] relative to the actual canvas display size
     final flatNorm = normalizePoints(simplified, targetSize);
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
     if (flatNorm.length >= 4) {
       // Need at least one complete segment (2 points → 4 values)
@@ -195,11 +154,7 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
         id: _uuid.v4(),
         tool: widget.activeTool,
         colorValue: widget.activeColor.toARGB32(),
-<<<<<<< HEAD
-        widthNorm: normalizeWidth(widget.activeWidthScene, imgSize.width),
-=======
         widthNorm: normalizeWidth(widget.activeWidthScene, targetSize.width),
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
         points: flatNorm,
         createdAt: DateTime.now(),
       );
@@ -248,13 +203,9 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
                 constraints.maxWidth,
                 constraints.maxHeight,
               );
-<<<<<<< HEAD
-              return SizedBox(
-=======
               _lastDisplaySize = displaySize;
               return SizedBox(
                 key: _canvasContentKey,
->>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
                 child: Stack(
