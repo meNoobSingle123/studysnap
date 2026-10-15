@@ -13,6 +13,9 @@ import '../../features/notes/domain/usecases/watch_all_notes_usecase.dart';
 import '../../features/notes/presentation/bloc/canvas_bloc.dart';
 import '../../features/notes/presentation/bloc/note_editor_bloc.dart';
 import '../../features/notes/presentation/bloc/note_list_bloc.dart';
+import '../../features/scanner/domain/usecases/compress_lecture_image_usecase.dart';
+import '../../features/scanner/domain/usecases/parse_qr_code_usecase.dart';
+import '../../features/scanner/presentation/bloc/scanner_bloc.dart';
 import '../../features/timetable/data/datasources/timetable_local_datasource.dart';
 import '../../features/timetable/data/repositories/timetable_repository_impl.dart';
 import '../../features/timetable/domain/repositories/timetable_repository.dart';
@@ -117,5 +120,19 @@ Future<void> configureDependencies({bool isTest = false}) async {
     ),
   );
   getIt.registerFactory<CanvasBloc>(() => CanvasBloc());
+
+  // Scanner & Camera Module (Huy - S08, CĐ 10)
+  getIt.registerLazySingleton<ParseQrCodeUseCase>(
+    () => const ParseQrCodeUseCase(),
+  );
+  getIt.registerLazySingleton<CompressLectureImageUseCase>(
+    () => const CompressLectureImageUseCase(),
+  );
+  getIt.registerFactory<ScannerBloc>(
+    () => ScannerBloc(
+      parseQrCodeUseCase: getIt<ParseQrCodeUseCase>(),
+      compressLectureImageUseCase: getIt<CompressLectureImageUseCase>(),
+    ),
+  );
 }
 

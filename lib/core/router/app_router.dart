@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/notes/presentation/pages/canvas_page.dart';
 import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
+import '../../features/scanner/presentation/pages/scanner_camera_page.dart';
 import '../../features/security/presentation/pages/app_lock_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
 import '../../features/timetable/presentation/pages/gpa_page.dart';
@@ -107,6 +108,11 @@ abstract final class AppRouter {
           final slotId = state.pathParameters['id'] ?? '';
           return SlotDetailPage(slotId: slotId);
         },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.scanner,
+        builder: (context, state) => const ScannerCameraPage(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

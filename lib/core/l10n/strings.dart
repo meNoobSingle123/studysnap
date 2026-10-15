@@ -97,6 +97,37 @@ abstract final class AppStrings {
   static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
   static const String appSettings = 'Cài đặt hệ thống';
 
+  // Scanner & Camera Feature (S08, CĐ 10)
+  static const String scannerTitle = 'Camera & Quét mã QR';
+  static const String qrScannerTab = 'Quét mã QR';
+  static const String cameraCaptureTab = 'Chụp ảnh bài giảng';
+  static const String scanQrPrompt = 'Hướng camera về phía mã QR tài liệu';
+  static const String invalidQrCode =
+      'Mã QR không hợp lệ. Chỉ chấp nhận mã có định dạng studysnap://doc?url=https://...';
+  static const String insecureHttpBlocked =
+      'Liên kết bị từ chối vì không sử dụng giao thức HTTPS bảo mật.';
+  static const String qrDocumentConfirmTitle = 'Xác nhận mở tài liệu';
+  static const String qrDocumentConfirmMessage =
+      'Bạn có muốn mở tài liệu từ tên miền:';
+  static const String openInBrowser = 'Mở trình duyệt';
+  static const String needNetworkConnection = 'Cần kết nối mạng để mở tài liệu';
+  static const String cameraPermissionRequired = 'Cần cấp quyền Camera';
+  static const String cameraPermissionGuide =
+      'Ứng dụng cần quyền Camera để chụp ảnh bài giảng và quét mã QR tài liệu. Vui lòng cấp quyền trong Cài đặt hệ thống.';
+  static const String openAppSettings = 'Mở Cài đặt';
+  static const String capturedImages = 'Ảnh bài giảng đã chụp';
+  static const String noImagesCaptured =
+      'Chưa có ảnh bài giảng nào. Bấm vào nút camera để chụp hoặc chọn ảnh.';
+  static const String takePhoto = 'Chụp ảnh';
+  static const String pickFromGallery = 'Chọn từ thư viện';
+  static const String compressingImage = 'Đang tối ưu & nén ảnh...';
+  static const String createNoteFromImage = 'Tạo ghi chú từ ảnh';
+  static const String testSampleQrCodes = 'Thử nghiệm mã QR mẫu';
+  static const String sampleValidQr1 = 'Mã hợp lệ (HCMUS Syllabus)';
+  static const String sampleValidQr2 = 'Mã hợp lệ (Google Drive)';
+  static const String sampleInvalidHttp = 'Mã không hợp lệ (HTTP không an toàn)';
+  static const String sampleInvalidScheme = 'Mã không hợp lệ (Sai Scheme)';
+
   // Timetable Feature (S02, S03, S04)
   static const String timetableTitle = 'Thời khóa biểu';
   static const String nextClassCountdown = 'Ca học tiếp theo';

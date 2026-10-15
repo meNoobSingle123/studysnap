@@ -19,5 +19,8 @@ abstract final class Routes {
 
   // Security Feature (S01)
   static const String lock = '/lock';
+
+  // Scanner & Camera Feature (Huy - S08)
+  static const String scanner = '/scanner';
 }
 
