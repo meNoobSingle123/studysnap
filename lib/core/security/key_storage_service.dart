@@ -50,6 +50,31 @@ class KeyStorageService {
     return _storage.containsKey(key: kDbEncryptionKeyName);
   }
 
+  static const String kAppLockEnabledKey = 'is_app_lock_enabled';
+
+  /// Kiểm tra xem tính năng khóa sinh trắc học có đang được bật không.
+  /// Mặc định là false để vào app trực tiếp không bị chặn.
+  Future<bool> isLockEnabled() async {
+    try {
+      final val = await _storage.read(key: kAppLockEnabledKey);
+      return val == 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Bật hoặc tắt tính năng khóa sinh trắc học.
+  Future<void> setLockEnabled(bool enabled) async {
+    try {
+      await _storage.write(
+        key: kAppLockEnabledKey,
+        value: enabled ? 'true' : 'false',
+      );
+    } catch (_) {
+      // Platform channels may not be available in headless tests
+    }
+  }
+
   /// Xóa khóa mã hóa khỏi secure storage.
   Future<void> clearEncryptionKey() async {
     await _storage.delete(key: kDbEncryptionKeyName);

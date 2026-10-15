@@ -55,3 +55,6 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 skills-lock.json
+
+# Markdown documents
+*.md

@@ -15,4 +15,11 @@ class InMemoryNoteRepository implements NoteRepository {
   Future<void> saveNote(LectureNote note) async {
     _storage[note.id] = note;
   }
+
+  @override
+  Future<List<LectureNote>> getAllNotes() async {
+    final list = _storage.values.toList();
+    list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return list;
+  }
 }

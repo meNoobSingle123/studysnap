@@ -124,5 +124,67 @@ void main() {
       // Body text should now contain [00:00] (initial position)
       expect(find.textContaining('[00:00]'), findsWidgets);
     });
+
+    testWidgets('tapping save button saves note with updated title and body into repository',
+        (tester) async {
+      await tester.pumpWidget(buildTestHarness(noteId: 'test-note-save'));
+      await tester.pumpAndSettle();
+
+      // Enter title and body
+      await tester.enterText(find.byType(TextField).first, 'Ghi chu tieu de');
+      await tester.enterText(find.byType(TextField).last, 'Ghi chu noi dung');
+      await tester.pump();
+
+      // Tap Save
+      await tester.tap(find.byIcon(Icons.save_outlined));
+      await tester.pumpAndSettle();
+
+      final savedNote = await repository.getNoteById('test-note-save');
+      expect(savedNote, isNotNull);
+      expect(savedNote!.title, 'Ghi chu tieu de');
+      expect(savedNote.bodyText, 'Ghi chu noi dung');
+    });
+
+    testWidgets('back button automatically saves unsaved changes to repository',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NoteEditorPage(noteId: 'test-note-back'),
+                    ),
+                  );
+                },
+                child: const Text('Open Editor'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Editor'));
+      await tester.pumpAndSettle();
+
+      // Enter title and body
+      await tester.enterText(find.byType(TextField).first, 'Tieu de moi');
+      await tester.enterText(find.byType(TextField).last, 'Noi dung moi');
+      await tester.pump();
+
+      // Tap Back button
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      // Verify note was saved in repository
+      final savedNote = await repository.getNoteById('test-note-back');
+      expect(savedNote, isNotNull);
+      expect(savedNote!.title, 'Tieu de moi');
+      expect(savedNote.bodyText, 'Noi dung moi');
+    });
   });
 }
