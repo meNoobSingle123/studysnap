@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
@@ -19,6 +21,7 @@ import '../../features/scanner/domain/usecases/compress_lecture_image_usecase.da
 import '../../features/scanner/domain/usecases/parse_qr_code_usecase.dart';
 import '../../features/scanner/presentation/bloc/scanner_bloc.dart';
 import '../../features/timetable/data/datasources/timetable_local_datasource.dart';
+import '../../features/timetable/data/datasources/timetable_remote_data_source.dart';
 import '../../features/timetable/data/repositories/timetable_repository_impl.dart';
 import '../../features/timetable/domain/repositories/timetable_repository.dart';
 import '../../features/timetable/domain/usecases/calculate_gpa_usecase.dart';
@@ -28,8 +31,6 @@ import '../../features/timetable/domain/usecases/save_subject_usecase.dart';
 import '../network/dio_client.dart';
 import '../security/bloc/auth_lock_bloc.dart';
 import '../security/key_storage_service.dart';
-
-import 'dart:io';
 
 /// Global service locator instance.
 final getIt = GetIt.instance;
@@ -54,6 +55,13 @@ Future<void> configureDependencies({bool isTest = false}) async {
   getIt.registerLazySingleton<KeyStorageService>(
     () => KeyStorageService(storage: getIt<FlutterSecureStorage>()),
   );
+
+  // Network & Core Client
+  getIt.registerLazySingleton<DioClient>(
+    () => DioClient(keyStorageService: getIt<KeyStorageService>()),
+  );
+
+  // Local Auth & Security Bloc
   getIt.registerLazySingleton<LocalAuthentication>(
     () => LocalAuthentication(),
   );
@@ -61,19 +69,14 @@ Future<void> configureDependencies({bool isTest = false}) async {
     () => AuthLockBloc(localAuth: getIt<LocalAuthentication>()),
   );
 
-  // Core network
-  getIt.registerLazySingleton<DioClient>(() => DioClient());
-
-  // Timetable Module (Huy phụ trách)
-  final timetableLocalDataSource = TimetableLocalDataSourceImpl(
-    keyStorageService: getIt<KeyStorageService>(),
+  // Timetable Module (Hive CE Local DataSource & Repositories)
+  getIt.registerLazySingleton<TimetableLocalDataSource>(
+    () => TimetableLocalDataSource(),
   );
-  await timetableLocalDataSource.init();
-  getIt.registerSingleton<TimetableLocalDataSource>(timetableLocalDataSource);
-
   getIt.registerLazySingleton<TimetableRepository>(
     () => TimetableRepositoryImpl(
       localDataSource: getIt<TimetableLocalDataSource>(),
+      seedMockData: !isTest,
     ),
   );
   getIt.registerLazySingleton<GetTimetableSlotsUseCase>(
@@ -148,6 +151,9 @@ Future<void> configureDependencies({bool isTest = false}) async {
       noteRepository: getIt<NoteRepository>(),
     ),
   );
+
+  // Timetable Module (Remote DataSource from team)
+  getIt.registerLazySingleton<TimetableRemoteDataSource>(
+    () => TimetableRemoteDataSourceImpl(dioClient: getIt<DioClient>()),
+  );
 }
-
-

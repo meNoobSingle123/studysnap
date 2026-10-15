@@ -1,0 +1,460 @@
+{
+  "info": {
+    "_postman_id": "studysnap-api-v1-collection",
+    "name": "StudySnap API Collection (Chương 5)",
+    "description": "Bộ Postman Collection kiểm thử hợp đồng API StudySnap theo chuẩn Chương 5 của tài liệu đặc tả docs/SPEC.md. Hỗ trợ đầy đủ 6 endpoints cốt lõi và mock response mẫu.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.studysnap.example.com",
+      "type": "string"
+    },
+    {
+      "key": "deviceId",
+      "value": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "type": "string"
+    },
+    {
+      "key": "adminSecretKey",
+      "value": "studysnap_admin_secret_key_2026",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "GET /v1/health (Kiểm tra kết nối)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "health"
+          ]
+        },
+        "description": "Kiểm tra tình trạng hoạt động của hệ thống máy chủ StudySnap backend."
+      },
+      "response": [
+        {
+          "name": "200 OK - Health Status",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "health"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-10-15T10:00:00Z\",\n  \"version\": \"1.0.0\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET /v1/terms/current (Học kỳ hiện tại)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-Device-Id",
+            "value": "{{deviceId}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/terms/current",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "terms",
+            "current"
+          ]
+        },
+        "description": "Lấy thông tin học kỳ hiện tại đang áp dụng trong hệ thống."
+      },
+      "response": [
+        {
+          "name": "200 OK - Current Term",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Device-Id",
+                "value": "{{deviceId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/terms/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "terms",
+                "current"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"termId\": \"2026-1\",\n  \"name\": \"Học kỳ 1 (2026 - 2027)\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2027-01-15\",\n  \"isCurrent\": true\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET /v1/timetable (Kéo ca học theo kỳ)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-Device-Id",
+            "value": "{{deviceId}}",
+            "type": "text"
+          },
+          {
+            "key": "If-None-Match",
+            "value": "w/\"timetable_2026_1_v1\"",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/timetable?termId=2026-1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "timetable"
+          ],
+          "query": [
+            {
+              "key": "termId",
+              "value": "2026-1",
+              "description": "Mã định danh học kỳ cần tải thời khóa biểu"
+            }
+          ]
+        },
+        "description": "Kéo danh sách môn học và các ca học của học kỳ được chỉ định. Hỗ trợ ETag tối ưu tải dữ liệu."
+      },
+      "response": [
+        {
+          "name": "200 OK - Timetable Data",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Device-Id",
+                "value": "{{deviceId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/timetable?termId=2026-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "timetable"
+              ],
+              "query": [
+                {
+                  "key": "termId",
+                  "value": "2026-1"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "ETag",
+              "value": "w/\"timetable_2026_1_v1\""
+            }
+          ],
+          "body": "{\n  \"termId\": \"2026-1\",\n  \"etag\": \"w/\\\"timetable_2026_1_v1\\\"\",\n  \"subjects\": [\n    {\n      \"id\": \"sub-cntt-001\",\n      \"code\": \"CS301\",\n      \"name\": \"Lập trình di động Flutter\",\n      \"credits\": 3,\n      \"colorArgb\": 4282557941\n    },\n    {\n      \"id\": \"sub-cntt-002\",\n      \"code\": \"CS302\",\n      \"name\": \"Trí tuệ nhân tạo\",\n      \"credits\": 4,\n      \"colorArgb\": 4294198070\n    }\n  ],\n  \"slots\": [\n    {\n      \"id\": \"slot-001\",\n      \"subjectId\": \"sub-cntt-001\",\n      \"dayOfWeek\": 2,\n      \"startMin\": 450,\n      \"endMin\": 540,\n      \"room\": \"A2-301\",\n      \"buildingId\": \"bld-campus-a\",\n      \"source\": \"system\"\n    },\n    {\n      \"id\": \"slot-002\",\n      \"subjectId\": \"sub-cntt-002\",\n      \"dayOfWeek\": 4,\n      \"startMin\": 810,\n      \"endMin\": 900,\n      \"room\": \"B1-102\",\n      \"buildingId\": \"bld-campus-b\",\n      \"source\": \"system\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET /v1/exams (Lấy lịch thi)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-Device-Id",
+            "value": "{{deviceId}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/exams?termId=2026-1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "exams"
+          ],
+          "query": [
+            {
+              "key": "termId",
+              "value": "2026-1",
+              "description": "Mã định danh học kỳ cần tải lịch thi"
+            }
+          ]
+        },
+        "description": "Tải danh sách ca thi các môn trong học kỳ."
+      },
+      "response": [
+        {
+          "name": "200 OK - Exam Schedule",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Device-Id",
+                "value": "{{deviceId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/exams?termId=2026-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "exams"
+              ],
+              "query": [
+                {
+                  "key": "termId",
+                  "value": "2026-1"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"termId\": \"2026-1\",\n  \"exams\": [\n    {\n      \"id\": \"exam-001\",\n      \"subjectId\": \"sub-cntt-001\",\n      \"subjectName\": \"Lập trình di động Flutter\",\n      \"date\": \"2026-12-20\",\n      \"startTime\": \"07:30\",\n      \"room\": \"A2-301\",\n      \"seatNumber\": \"S-24\",\n      \"examType\": \"final\"\n    },\n    {\n      \"id\": \"exam-002\",\n      \"subjectId\": \"sub-cntt-002\",\n      \"subjectName\": \"Trí tuệ nhân tạo\",\n      \"date\": \"2026-12-25\",\n      \"startTime\": \"13:30\",\n      \"room\": \"B1-102\",\n      \"seatNumber\": \"S-18\",\n      \"examType\": \"final\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET /v1/campus/buildings (Danh sách tòa nhà)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/campus/buildings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "campus",
+            "buildings"
+          ]
+        },
+        "description": "Lấy danh sách các tòa nhà trong khuôn viên trường kèm tọa độ GPS phục vụ điều hướng (S10)."
+      },
+      "response": [
+        {
+          "name": "200 OK - Campus Buildings",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/campus/buildings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "campus",
+                "buildings"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"buildings\": [\n    {\n      \"id\": \"bld-campus-a\",\n      \"name\": \"Tòa nhà A - Trung tâm Công nghệ\",\n      \"code\": \"A\",\n      \"latitude\": 10.8018,\n      \"longitude\": 106.7145,\n      \"radiusMeters\": 50\n    },\n    {\n      \"id\": \"bld-campus-b\",\n      \"name\": \"Tòa nhà B - Giảng đường Đa năng\",\n      \"code\": \"B\",\n      \"latitude\": 10.8024,\n      \"longitude\": 106.7152,\n      \"radiusMeters\": 50\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "POST /v1/admin/schedule-change (Dời lịch học & gửi FCM)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-Admin-Key",
+            "value": "{{adminSecretKey}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"slotId\": \"slot-001\",\n  \"newDayOfWeek\": 3,\n  \"newStartMin\": 480,\n  \"newEndMin\": 570,\n  \"newRoom\": \"A2-405\",\n  \"reason\": \"Giảng viên đổi phòng học chuyên đề\",\n  \"notifyFcm\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/admin/schedule-change",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "admin",
+            "schedule-change"
+          ]
+        },
+        "description": "Endpoint dành cho quản trị viên thay đổi ca học và đẩy thông báo FCM tới sinh viên."
+      },
+      "response": [
+        {
+          "name": "202 Accepted - Schedule Changed",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Admin-Key",
+                "value": "{{adminSecretKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slotId\": \"slot-001\",\n  \"newDayOfWeek\": 3,\n  \"newStartMin\": 480,\n  \"newEndMin\": 570,\n  \"newRoom\": \"A2-405\",\n  \"reason\": \"Giảng viên đổi phòng học chuyên đề\",\n  \"notifyFcm\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/schedule-change",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "schedule-change"
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"success\": true,\n  \"message\": \"Schedule change processed and FCM notification queued.\",\n  \"jobId\": \"job-fcm-998811\"\n}"
+        }
+      ]
+    }
+  ]
+}
