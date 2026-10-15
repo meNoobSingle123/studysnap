@@ -7,4 +7,10 @@ abstract class NoteRepository {
 
   /// Saves or updates a lecture note.
   Future<void> saveNote(LectureNote note);
+<<<<<<< HEAD
+=======
+
+  /// Retrieves all saved lecture notes.
+  Future<List<LectureNote>> getAllNotes();
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 }

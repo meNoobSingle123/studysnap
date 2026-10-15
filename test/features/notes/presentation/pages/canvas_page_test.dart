@@ -127,5 +127,66 @@ void main() {
       // Canvas page still visible
       expect(find.byType(CanvasPage), findsOneWidget);
     });
+
+    testWidgets('after saving, back button pops without discard dialog', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).push(
+                    MaterialPageRoute(
+                      builder: (_) => CanvasPage(
+                        noteId: 'note-1',
+                        originalImageSize: const Size(400, 400),
+                        onSave: (_, __) async {},
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open Canvas'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Canvas'));
+      await tester.pumpAndSettle();
+
+      // Add a stroke
+      final bloc = tester.element(find.byType(CanvasDrawingBoard)).read<CanvasBloc>();
+      bloc.add(
+        AddStrokeEvent(
+          Stroke(
+            id: 'stroke-1',
+            tool: StrokeTool.pen,
+            colorValue: 0xFF000000,
+            widthNorm: 0.01,
+            points: const [0.1, 0.1, 0.5, 0.5],
+            createdAt: DateTime.now(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap Save
+      await tester.tap(find.text(AppStrings.save));
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+
+      // Tap Back
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Should be back to the initial page, no dialog shown
+      expect(find.text(AppStrings.canvasDiscardConfirmTitle), findsNothing);
+      expect(find.text('Open Canvas'), findsOneWidget);
+    });
   });
 }

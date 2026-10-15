@@ -76,6 +76,11 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
   CanvasMode _mode = CanvasMode.view;
   final _transformationController = TransformationController();
   final _uuid = const Uuid();
+<<<<<<< HEAD
+=======
+  final GlobalKey _canvasContentKey = GlobalKey();
+  StrokeSize? _lastDisplaySize;
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
   /// Points of the stroke currently being drawn (in display/paint pixels).
   final ValueNotifier<List<Offset>> _activePoints = ValueNotifier([]);
@@ -101,12 +106,20 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     if (_mode != CanvasMode.draw) return;
     _activePoints.value = [];
     _scenePointsBuffer.clear();
+<<<<<<< HEAD
     _addPoint(details.localPosition);
+=======
+    _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     if (_mode != CanvasMode.draw) return;
+<<<<<<< HEAD
     _addPoint(details.localPosition);
+=======
+    _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   }
 
   void _onPanEnd(DragEndDetails _) {
@@ -114,6 +127,7 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     _finalizeStroke();
   }
 
+<<<<<<< HEAD
   /// Converts [localPos] (touch space) → scene space → adds to buffers.
   void _addPoint(Offset localPos) {
     // Step 1: touch → scene (accounting for zoom / pan)
@@ -128,19 +142,52 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     //         it sits inside the InteractiveViewer's coordinate space).
     final current = List<Offset>.from(_activePoints.value)
       ..add(Offset(sceneOffset.dx, sceneOffset.dy));
+=======
+  /// Converts touch position to scene space and records point.
+  /// Uses [RenderBox.globalToLocal] from [_canvasContentKey] to eliminate any
+  /// touch offset or screen offset, falling back to [_transformationController.toScene].
+  void _addPoint(Offset globalPos, {required Offset fallbackLocal}) {
+    Offset sceneOffset;
+    final renderBox = _canvasContentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null && renderBox.hasSize) {
+      sceneOffset = renderBox.globalToLocal(globalPos);
+    } else {
+      sceneOffset = _transformationController.toScene(fallbackLocal);
+    }
+
+    final scenePoint = StrokePoint(sceneOffset.dx, sceneOffset.dy);
+    _scenePointsBuffer.add(scenePoint);
+
+    final current = List<Offset>.from(_activePoints.value)..add(sceneOffset);
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
     _activePoints.value = current;
   }
 
   /// Normalizes, simplifies, and emits the completed stroke.
   void _finalizeStroke() {
+<<<<<<< HEAD
     final imgSize = widget.originalImageSize;
     final domainImageSize = StrokeSize(imgSize.width, imgSize.height);
+=======
+    final renderBox = _canvasContentKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetSize = (renderBox != null && renderBox.hasSize && renderBox.size.width > 0 && renderBox.size.height > 0)
+        ? StrokeSize(renderBox.size.width, renderBox.size.height)
+        : (_lastDisplaySize ??
+            (widget.originalImageSize.width > 0 && widget.originalImageSize.height > 0
+                ? StrokeSize(widget.originalImageSize.width, widget.originalImageSize.height)
+                : const StrokeSize(1080, 1920)));
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
     // Apply simplification to remove redundant close points (< 1.5 px)
     final simplified = simplifyPoints(_scenePointsBuffer, threshold: 1.5);
 
+<<<<<<< HEAD
     // Normalize to [0, 1]
     final flatNorm = normalizePoints(simplified, domainImageSize);
+=======
+    // Normalize to [0, 1] relative to the actual canvas display size
+    final flatNorm = normalizePoints(simplified, targetSize);
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
 
     if (flatNorm.length >= 4) {
       // Need at least one complete segment (2 points → 4 values)
@@ -148,7 +195,11 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
         id: _uuid.v4(),
         tool: widget.activeTool,
         colorValue: widget.activeColor.toARGB32(),
+<<<<<<< HEAD
         widthNorm: normalizeWidth(widget.activeWidthScene, imgSize.width),
+=======
+        widthNorm: normalizeWidth(widget.activeWidthScene, targetSize.width),
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
         points: flatNorm,
         createdAt: DateTime.now(),
       );
@@ -197,7 +248,13 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
                 constraints.maxWidth,
                 constraints.maxHeight,
               );
+<<<<<<< HEAD
               return SizedBox(
+=======
+              _lastDisplaySize = displaySize;
+              return SizedBox(
+                key: _canvasContentKey,
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
                 child: Stack(

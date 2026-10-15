@@ -94,5 +94,43 @@ void main() {
       verify(() => mockStorage.delete(key: KeyStorageService.kDbEncryptionKeyName))
           .called(1);
     });
+
+    test('isLockEnabled returns false by default or when not "true"', () async {
+      when(() => mockStorage.read(key: KeyStorageService.kAppLockEnabledKey))
+          .thenAnswer((_) async => null);
+
+      expect(await keyStorageService.isLockEnabled(), isFalse);
+
+      when(() => mockStorage.read(key: KeyStorageService.kAppLockEnabledKey))
+          .thenAnswer((_) async => 'false');
+
+      expect(await keyStorageService.isLockEnabled(), isFalse);
+    });
+
+    test('isLockEnabled returns true when stored value is "true"', () async {
+      when(() => mockStorage.read(key: KeyStorageService.kAppLockEnabledKey))
+          .thenAnswer((_) async => 'true');
+
+      expect(await keyStorageService.isLockEnabled(), isTrue);
+    });
+
+    test('setLockEnabled writes correct boolean string to storage', () async {
+      when(() => mockStorage.write(
+            key: KeyStorageService.kAppLockEnabledKey,
+            value: any(named: 'value'),
+          )).thenAnswer((_) async {});
+
+      await keyStorageService.setLockEnabled(true);
+      verify(() => mockStorage.write(
+            key: KeyStorageService.kAppLockEnabledKey,
+            value: 'true',
+          )).called(1);
+
+      await keyStorageService.setLockEnabled(false);
+      verify(() => mockStorage.write(
+            key: KeyStorageService.kAppLockEnabledKey,
+            value: 'false',
+          )).called(1);
+    });
   });
 }

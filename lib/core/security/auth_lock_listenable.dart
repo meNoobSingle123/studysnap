@@ -8,10 +8,30 @@ class AuthLockListenable extends ChangeNotifier {
   AuthLockListenable._();
 
   bool _isLocked = true;
+<<<<<<< HEAD
   bool get isLocked => _isLocked;
 
   void updateLockState(bool locked) {
     _isLocked = locked;
     notifyListeners();
+=======
+  bool _isLockEnabled = false;
+
+  bool get isLocked => _isLocked;
+  bool get isLockEnabled => _isLockEnabled;
+
+  void setLockEnabled(bool enabled) {
+    if (_isLockEnabled != enabled) {
+      _isLockEnabled = enabled;
+      notifyListeners();
+    }
+  }
+
+  void updateLockState(bool locked) {
+    if (_isLocked != locked) {
+      _isLocked = locked;
+      notifyListeners();
+    }
+>>>>>>> 65bb05b538bafaaf5ee63db54ee8a586f3e3f474
   }
 }
