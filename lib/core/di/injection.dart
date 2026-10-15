@@ -58,7 +58,7 @@ Future<void> configureDependencies({bool isTest = false}) async {
 
   // Network & Core Client
   getIt.registerLazySingleton<DioClient>(
-    () => DioClient(keyStorageService: getIt<KeyStorageService>()),
+    () => DioClient(),
   );
 
   // Local Auth & Security Bloc
@@ -71,14 +71,14 @@ Future<void> configureDependencies({bool isTest = false}) async {
 
   // Timetable Module (Hive CE Local DataSource & Repositories)
   getIt.registerLazySingleton<TimetableLocalDataSource>(
-    () => TimetableLocalDataSource(),
+    () => TimetableLocalDataSourceImpl(keyStorageService: getIt<KeyStorageService>()),
   );
   getIt.registerLazySingleton<TimetableRepository>(
     () => TimetableRepositoryImpl(
       localDataSource: getIt<TimetableLocalDataSource>(),
-      seedMockData: !isTest,
     ),
   );
+
   getIt.registerLazySingleton<GetTimetableSlotsUseCase>(
     () => GetTimetableSlotsUseCase(getIt<TimetableRepository>()),
   );

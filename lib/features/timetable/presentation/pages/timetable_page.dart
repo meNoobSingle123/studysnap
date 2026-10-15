@@ -98,8 +98,8 @@ class _TimetablePageState extends State<TimetablePage> {
 
     return BlocProvider(
       create: (context) => TimetableBloc(
-        getTimetableSlotsUseCase: getIt<GetTimetableSlotsUseCase>(),
-        getSubjectsUseCase: getIt<GetSubjectsUseCase>(),
+        slotsUseCase: getIt<GetTimetableSlotsUseCase>(),
+        subjectsUseCase: getIt<GetSubjectsUseCase>(),
       )..add(DaySelectedEvent(DateTime.now())),
       child: Builder(
         builder: (blocContext) => _TimetableView(
@@ -665,7 +665,7 @@ class _TimetableViewState extends State<_TimetableView> {
                 onChanged: (active) {
                   context
                       .read<TimetableBloc>()
-                      .add(ToggleSlotReminderEvent(slot.id, active));
+                      .add(ToggleSlotReminderEvent(slot.id));
                 },
               ),
             ],
