@@ -1,0 +1,115 @@
+{
+  "termId": "2026-1",
+  "termName": "Học kỳ 1 (2026 - 2027)",
+  "subjects": [
+    {
+      "id": "sub_1",
+      "code": "CSC10006",
+      "name": "Mạng máy tính cơ bản",
+      "credits": 4,
+      "colorArgb": 4280391410
+    },
+    {
+      "id": "sub_2",
+      "code": "CSC10007",
+      "name": "Hệ điều hành",
+      "credits": 4,
+      "colorArgb": 4282353787
+    },
+    {
+      "id": "sub_3",
+      "code": "CSC10008",
+      "name": "Lập trình thiết bị di động (Flutter)",
+      "credits": 4,
+      "colorArgb": 4294198070
+    },
+    {
+      "id": "sub_4",
+      "code": "MTH10004",
+      "name": "Xác suất thống kê",
+      "credits": 3,
+      "colorArgb": 4289724448
+    },
+    {
+      "id": "sub_5",
+      "code": "CSC10009",
+      "name": "Cơ sở dữ liệu nâng cao",
+      "credits": 4,
+      "colorArgb": 4287349386
+    }
+  ],
+  "slots": [
+    {
+      "id": "slot_mon_1",
+      "subjectId": "sub_1",
+      "dayOfWeek": 1,
+      "startMin": 450,
+      "endMin": 540,
+      "room": "H2.304",
+      "buildingId": "H2",
+      "termStart": "2026-09-01T00:00:00.000Z",
+      "termEnd": "2026-12-31T23:59:59.000Z",
+      "source": "system"
+    },
+    {
+      "id": "slot_mon_2",
+      "subjectId": "sub_2",
+      "dayOfWeek": 1,
+      "startMin": 570,
+      "endMin": 660,
+      "room": "A1.202",
+      "buildingId": "A1",
+      "termStart": "2026-09-01T00:00:00.000Z",
+      "termEnd": "2026-12-31T23:59:59.000Z",
+      "source": "system"
+    },
+    {
+      "id": "slot_tue_1",
+      "subjectId": "sub_3",
+      "dayOfWeek": 2,
+      "startMin": 450,
+      "endMin": 540,
+      "room": "B.105",
+      "buildingId": "B",
+      "termStart": "2026-09-01T00:00:00.000Z",
+      "termEnd": "2026-12-31T23:59:59.000Z",
+      "source": "system"
+    },
+    {
+      "id": "slot_wed_1",
+      "subjectId": "sub_4",
+      "dayOfWeek": 3,
+      "startMin": 480,
+      "endMin": 600,
+      "room": "C.201",
+      "buildingId": "C",
+      "termStart": "2026-09-01T00:00:00.000Z",
+      "termEnd": "2026-12-31T23:59:59.000Z",
+      "source": "system"
+    },
+    {
+      "id": "slot_thu_1",
+      "subjectId": "sub_5",
+      "dayOfWeek": 4,
+      "startMin": 570,
+      "endMin": 660,
+      "room": "H2.401",
+      "buildingId": "H2",
+      "termStart": "2026-09-01T00:00:00.000Z",
+      "termEnd": "2026-12-31T23:59:59.000Z",
+      "source": "system"
+    },
+    {
+      "id": "slot_fri_1",
+      "subjectId": "sub_3",
+      "dayOfWeek": 5,
+      "startMin": 450,
+      "endMin": 540,
+      "room": "B.105",
+      "buildingId": "B",
+      "termStart": "2026-09-01T00:00:00.000Z",
+      "termEnd": "2026-12-31T23:59:59.000Z",
+      "source": "system"
+    }
+  ]
+}

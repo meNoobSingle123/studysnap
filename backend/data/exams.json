@@ -1,0 +1,76 @@
+{
+  "termId": "2026-1",
+  "termName": "Học kỳ 1 (2026 - 2027)",
+  "exams": [
+    {
+      "id": "exam-001",
+      "subjectId": "sub_1",
+      "subjectName": "Mạng máy tính cơ bản",
+      "date": "2026-12-21T07:30:00.000Z",
+      "startTime": "07:30",
+      "startMin": 450,
+      "durationMin": 90,
+      "room": "H2.304",
+      "buildingId": "H2",
+      "seatNumber": "S-14",
+      "examType": "final",
+      "source": "system"
+    },
+    {
+      "id": "exam-002",
+      "subjectId": "sub_2",
+      "subjectName": "Hệ điều hành",
+      "date": "2026-12-23T13:30:00.000Z",
+      "startTime": "13:30",
+      "startMin": 810,
+      "durationMin": 90,
+      "room": "A1.202",
+      "buildingId": "A1",
+      "seatNumber": "S-28",
+      "examType": "final",
+      "source": "system"
+    },
+    {
+      "id": "exam-003",
+      "subjectId": "sub_3",
+      "subjectName": "Lập trình thiết bị di động (Flutter)",
+      "date": "2026-12-25T07:30:00.000Z",
+      "startTime": "07:30",
+      "startMin": 450,
+      "durationMin": 120,
+      "room": "B.105",
+      "buildingId": "B",
+      "seatNumber": "S-05",
+      "examType": "final",
+      "source": "system"
+    },
+    {
+      "id": "exam-004",
+      "subjectId": "sub_4",
+      "subjectName": "Xác suất thống kê",
+      "date": "2026-12-28T09:30:00.000Z",
+      "startTime": "09:30",
+      "startMin": 570,
+      "durationMin": 90,
+      "room": "C.201",
+      "buildingId": "C",
+      "seatNumber": "S-32",
+      "examType": "final",
+      "source": "system"
+    },
+    {
+      "id": "exam-005",
+      "subjectId": "sub_5",
+      "subjectName": "Cơ sở dữ liệu nâng cao",
+      "date": "2026-12-30T13:30:00.000Z",
+      "startTime": "13:30",
+      "startMin": 810,
+      "durationMin": 90,
+      "room": "H2.401",
+      "buildingId": "H2",
+      "seatNumber": "S-19",
+      "examType": "final",
+      "source": "system"
+    }
+  ]
+}
