@@ -45,6 +45,12 @@ class _TimetableViewState extends State<_TimetableView> {
       appBar: AppBar(
         title: const Text(AppStrings.timetableTitle),
         actions: [
+          // Nút xuất PDF Thời khóa biểu (S09)
+          IconButton(
+            tooltip: AppStrings.pdfExportTitle,
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => context.push(Routes.pdfExport),
+          ),
           // Nút mở nhanh Dự phóng GPA (S04)
           IconButton(
             tooltip: AppStrings.gpaProjectionTitle,

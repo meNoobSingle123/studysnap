@@ -22,5 +22,11 @@ abstract final class Routes {
 
   // Scanner & Camera Feature (Huy - S08)
   static const String scanner = '/scanner';
+
+  // Export PDF Feature (Huy - S09)
+  static const String pdfExport = '/export/pdf';
+  static String pdfExportRoute({String? noteId}) =>
+      noteId != null ? '/export/pdf?noteId=$noteId' : '/export/pdf';
 }
+
 

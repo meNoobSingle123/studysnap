@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/export/domain/models/pdf_export_models.dart';
+import '../../features/export/presentation/pages/pdf_export_page.dart';
 import '../../features/notes/presentation/pages/canvas_page.dart';
 import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
@@ -113,6 +115,18 @@ abstract final class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: Routes.scanner,
         builder: (context, state) => const ScannerCameraPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.pdfExport,
+        builder: (context, state) {
+          final noteId = state.uri.queryParameters['noteId'];
+          final type = noteId != null ? PdfExportType.note : PdfExportType.timetable;
+          return PdfExportPage(
+            initialType: type,
+            initialNoteId: noteId,
+          );
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

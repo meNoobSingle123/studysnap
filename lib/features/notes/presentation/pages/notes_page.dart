@@ -61,6 +61,11 @@ class _NotesViewState extends State<_NotesView> {
       appBar: AppBar(
         title: const Text(AppStrings.notesTab),
         actions: [
+          IconButton(
+            tooltip: AppStrings.pdfExportTitle,
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () => context.push(Routes.pdfExportRoute()),
+          ),
           BlocBuilder<NoteListBloc, NoteListState>(
             builder: (context, state) {
               return PopupMenuButton<NoteSortOption>(

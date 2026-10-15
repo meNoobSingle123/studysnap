@@ -153,6 +153,21 @@ abstract final class AppStrings {
   static const String emptyData = 'Không có dữ liệu.';
   static const String success = 'Thao tác thành công';
 
+  // Export PDF Feature (Huy - S09)
+  static const String pdfExportTitle = 'Xuất & In PDF (A4)';
+  static const String exportTimetable = 'Thời khóa biểu & Lịch thi';
+  static const String exportNotes = 'Ghi chú bài giảng';
+  static const String orientationPortrait = 'Khổ dọc (Portrait)';
+  static const String orientationLandscape = 'Khổ ngang (Landscape)';
+  static const String printPdf = 'In ấn';
+  static const String sharePdf = 'Chia sẻ PDF';
+  static const String openWithExternalApp = 'Mở ứng dụng ngoài';
+  static const String pdfGeneratedSuccess = 'Tạo file PDF thành công';
+  static const String benchmarkTitle = 'Chỉ số hiệu năng (NFR Benchmark)';
+  static const String timetablePdfHeader = 'THỜI KHÓA BIỂU & LỊCH THI HỌC KỲ';
+  static const String notePdfHeader = 'PHIẾU GHI CHÚ BÀI GIẢNG';
+  static const String institutionName = 'ĐẠI HỌC KHOA HỌC TỰ NHIÊN - ĐHQG-HCM';
+
   // Error Messages
   static const String errorNetwork = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền internet.';
   static const String errorServer = 'Hệ thống máy chủ đang bận. Vui lòng thử lại sau.';
@@ -161,4 +176,6 @@ abstract final class AppStrings {
   static const String errorPermission = 'Ứng dụng chưa được cấp quyền để thực hiện tính năng này.';
   static const String errorUnknown = 'Đã có lỗi không xác định xảy ra. Vui lòng thử lại.';
   static const String pageNotFound = 'Không tìm thấy trang yêu cầu.';
+  static const String errorPdfGeneration = 'Không thể tạo file PDF. Vui lòng thử lại.';
 }
+

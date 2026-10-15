@@ -28,6 +28,16 @@ class ToolsPage extends StatelessWidget {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
+              leading: const Icon(Icons.picture_as_pdf_rounded),
+              title: const Text(AppStrings.pdfExportTitle),
+              subtitle: const Text('Xuất Thời khóa biểu & Ghi chú A4 (S09)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.pdfExport),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
               leading: const Icon(Icons.map_outlined),
               title: const Text(AppStrings.mapNavigation),
               trailing: const Icon(Icons.chevron_right),

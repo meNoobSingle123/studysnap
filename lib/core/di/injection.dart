@@ -3,6 +3,8 @@ import 'package:get_it/get_it.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../features/export/domain/services/pdf_generator_service.dart';
+import '../../features/export/presentation/bloc/pdf_export_bloc.dart';
 import '../../features/notes/data/repositories/in_memory_note_repository.dart';
 import '../../features/notes/domain/repositories/note_repository.dart';
 import '../../features/notes/domain/usecases/delete_note_usecase.dart';
@@ -134,5 +136,18 @@ Future<void> configureDependencies({bool isTest = false}) async {
       compressLectureImageUseCase: getIt<CompressLectureImageUseCase>(),
     ),
   );
+
+  // Export PDF Module (Huy - S09, CĐ 4)
+  getIt.registerLazySingleton<PdfGeneratorService>(
+    () => PdfGeneratorService(),
+  );
+  getIt.registerFactory<PdfExportBloc>(
+    () => PdfExportBloc(
+      pdfGeneratorService: getIt<PdfGeneratorService>(),
+      timetableRepository: getIt<TimetableRepository>(),
+      noteRepository: getIt<NoteRepository>(),
+    ),
+  );
 }
+
 
