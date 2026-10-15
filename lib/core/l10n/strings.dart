@@ -95,6 +95,11 @@ abstract final class AppStrings {
   static const String biometricsSuccess = 'Mở khóa thành công';
   static const String appLocked = 'Ứng dụng đang khóa';
   static const String appUnlocked = 'Ứng dụng đã mở khóa';
+  static const String biometricLockTitle = 'Khóa ứng dụng bằng sinh trắc học';
+  static const String biometricLockSubtitle = 'Yêu cầu vân tay hoặc mã PIN khi mở ứng dụng';
+  static const String biometricLockEnabledSuccess = 'Đã bật khóa sinh trắc học';
+  static const String biometricLockDisabledSuccess = 'Đã tắt khóa sinh trắc học';
+  static const String biometricAuthRequiredToEnable = 'Xác thực để bật khóa ứng dụng';
 
   // Tools & Settings Feature (S10, S13)
   static const String toolsTitle = 'Công cụ & Cài đặt';

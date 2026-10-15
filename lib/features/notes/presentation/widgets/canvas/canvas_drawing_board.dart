@@ -76,6 +76,8 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
   CanvasMode _mode = CanvasMode.view;
   final _transformationController = TransformationController();
   final _uuid = const Uuid();
+  final GlobalKey _canvasContentKey = GlobalKey();
+  StrokeSize? _lastDisplaySize;
 
   /// Points of the stroke currently being drawn (in display/paint pixels).
   final ValueNotifier<List<Offset>> _activePoints = ValueNotifier([]);
@@ -101,12 +103,12 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     if (_mode != CanvasMode.draw) return;
     _activePoints.value = [];
     _scenePointsBuffer.clear();
-    _addPoint(details.localPosition);
+    _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     if (_mode != CanvasMode.draw) return;
-    _addPoint(details.localPosition);
+    _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
   }
 
   void _onPanEnd(DragEndDetails _) {
@@ -114,33 +116,40 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
     _finalizeStroke();
   }
 
-  /// Converts [localPos] (touch space) → scene space → adds to buffers.
-  void _addPoint(Offset localPos) {
-    // Step 1: touch → scene (accounting for zoom / pan)
-    final sceneOffset = _transformationController.toScene(localPos);
-    final scenePoint = StrokePoint(sceneOffset.dx, sceneOffset.dy);
+  /// Converts touch position to scene space and records point.
+  /// Uses [RenderBox.globalToLocal] from [_canvasContentKey] to eliminate any
+  /// touch offset or screen offset, falling back to [_transformationController.toScene].
+  void _addPoint(Offset globalPos, {required Offset fallbackLocal}) {
+    Offset sceneOffset;
+    final renderBox = _canvasContentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null && renderBox.hasSize) {
+      sceneOffset = renderBox.globalToLocal(globalPos);
+    } else {
+      sceneOffset = _transformationController.toScene(fallbackLocal);
+    }
 
-    // Step 2: accumulate scene points for normalization
+    final scenePoint = StrokePoint(sceneOffset.dx, sceneOffset.dy);
     _scenePointsBuffer.add(scenePoint);
 
-    // Step 3: accumulate display-space points for the active painter (no
-    //         normalization needed — painter uses scene coords directly since
-    //         it sits inside the InteractiveViewer's coordinate space).
-    final current = List<Offset>.from(_activePoints.value)
-      ..add(Offset(sceneOffset.dx, sceneOffset.dy));
+    final current = List<Offset>.from(_activePoints.value)..add(sceneOffset);
     _activePoints.value = current;
   }
 
   /// Normalizes, simplifies, and emits the completed stroke.
   void _finalizeStroke() {
-    final imgSize = widget.originalImageSize;
-    final domainImageSize = StrokeSize(imgSize.width, imgSize.height);
+    final renderBox = _canvasContentKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetSize = (renderBox != null && renderBox.hasSize && renderBox.size.width > 0 && renderBox.size.height > 0)
+        ? StrokeSize(renderBox.size.width, renderBox.size.height)
+        : (_lastDisplaySize ??
+            (widget.originalImageSize.width > 0 && widget.originalImageSize.height > 0
+                ? StrokeSize(widget.originalImageSize.width, widget.originalImageSize.height)
+                : const StrokeSize(1080, 1920)));
 
     // Apply simplification to remove redundant close points (< 1.5 px)
     final simplified = simplifyPoints(_scenePointsBuffer, threshold: 1.5);
 
-    // Normalize to [0, 1]
-    final flatNorm = normalizePoints(simplified, domainImageSize);
+    // Normalize to [0, 1] relative to the actual canvas display size
+    final flatNorm = normalizePoints(simplified, targetSize);
 
     if (flatNorm.length >= 4) {
       // Need at least one complete segment (2 points → 4 values)
@@ -148,7 +157,7 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
         id: _uuid.v4(),
         tool: widget.activeTool,
         colorValue: widget.activeColor.toARGB32(),
-        widthNorm: normalizeWidth(widget.activeWidthScene, imgSize.width),
+        widthNorm: normalizeWidth(widget.activeWidthScene, targetSize.width),
         points: flatNorm,
         createdAt: DateTime.now(),
       );
@@ -197,7 +206,9 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
                 constraints.maxWidth,
                 constraints.maxHeight,
               );
+              _lastDisplaySize = displaySize;
               return SizedBox(
+                key: _canvasContentKey,
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
                 child: Stack(

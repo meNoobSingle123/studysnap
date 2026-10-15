@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
+import '../../../../core/router/routes.dart';
 import '../../../../core/security/bloc/auth_lock_bloc.dart';
 import '../../../../core/security/bloc/auth_lock_event.dart';
 import '../../../../core/security/bloc/auth_lock_state.dart';
@@ -62,7 +65,22 @@ class _AppLockViewState extends State<_AppLockView> {
 
     return Scaffold(
       body: SafeArea(
-        child: BlocBuilder<AuthLockBloc, AuthLockState>(
+        child: BlocListener<AuthLockBloc, AuthLockState>(
+          listener: (context, state) {
+            if (state is AuthUnlocked) {
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                if (router.canPop()) {
+                  router.pop();
+                } else {
+                  router.go(Routes.timetable);
+                }
+              } else if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            }
+          },
+          child: BlocBuilder<AuthLockBloc, AuthLockState>(
           builder: (context, state) {
             final isAuthenticating =
                 state is AuthLocked && state.isAuthenticating;
@@ -222,6 +240,7 @@ class _AppLockViewState extends State<_AppLockView> {
           },
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

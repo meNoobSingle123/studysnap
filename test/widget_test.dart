@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nhom_7/core/di/injection.dart';
 import 'package:nhom_7/core/l10n/strings.dart';
-import 'package:nhom_7/core/security/auth_lock_listenable.dart';
+import 'package:nhom_7/core/router/app_router.dart';
+import 'package:nhom_7/core/router/routes.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_bloc.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_event.dart';
 import 'package:nhom_7/features/security/presentation/pages/app_lock_page.dart';
@@ -11,7 +12,6 @@ import 'package:nhom_7/main.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
-  setUp(() async {
     FlutterSecureStorage.setMockInitialValues({});
     AuthLockListenable.instance.updateLockState(true);
     await configureDependencies(isTest: true);
@@ -27,7 +27,11 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    // Verify S01 AppLockPage is displayed on initial locked state
+    // Navigate to lock screen
+    AppRouter.router.go(Routes.lock);
+    await tester.pumpAndSettle();
+
+    // Verify S01 AppLockPage is displayed on locked state
     expect(find.byType(AppLockPage), findsOneWidget);
     expect(find.text(AppStrings.unlockWithBiometrics), findsOneWidget);
 
@@ -43,7 +47,6 @@ void main() {
 
   testWidgets('MyApp boots up with 3 tabs and switches branches correctly',
       (WidgetTester tester) async {
-    getIt<AuthLockBloc>().add(const UnlockApp());
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 

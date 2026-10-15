@@ -62,6 +62,7 @@ class _CanvasPageView extends StatefulWidget {
 
 class _CanvasPageViewState extends State<_CanvasPageView> {
   bool _isSaving = false;
+  bool _hasUnsavedChanges = false;
 
   Future<void> _handleSave(CanvasState state) async {
     setState(() => _isSaving = true);
@@ -76,6 +77,9 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
       }
 
       if (mounted) {
+        setState(() {
+          _hasUnsavedChanges = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.canvasExportSuccess)),
         );
@@ -88,7 +92,7 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
   }
 
   Future<bool> _confirmDiscard(CanvasState state) async {
-    if (state.strokes.isEmpty) return true;
+    if (!_hasUnsavedChanges) return true;
 
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -115,10 +119,16 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
   Widget build(BuildContext context) {
     final bloc = context.read<CanvasBloc>();
 
-    return BlocBuilder<CanvasBloc, CanvasState>(
+    return BlocConsumer<CanvasBloc, CanvasState>(
+      listenWhen: (prev, curr) => prev.strokes != curr.strokes,
+      listener: (context, state) {
+        if (!_hasUnsavedChanges && state.strokes.isNotEmpty) {
+          setState(() => _hasUnsavedChanges = true);
+        }
+      },
       builder: (context, state) {
         return PopScope(
-          canPop: state.strokes.isEmpty,
+          canPop: !_hasUnsavedChanges,
           onPopInvokedWithResult: (didPop, _) async {
             if (didPop) return;
             final canLeave = await _confirmDiscard(state);
@@ -129,6 +139,7 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
           child: Scaffold(
             appBar: AppBar(
               title: const Text(AppStrings.canvasPageTitle),
+              leading: const BackButton(),
               actions: [
                 if (_isSaving)
                   const Padding(
@@ -160,9 +171,18 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                     activeTool: state.selectedTool,
                     activeColor: Color(state.selectedColor),
                     activeWidthScene: state.strokeWidth,
-                    onStrokeAdded: (stroke) => bloc.add(AddStrokeEvent(stroke)),
-                    onUndo: () => bloc.add(const UndoEvent()),
-                    onRedo: () => bloc.add(const RedoEvent()),
+                    onStrokeAdded: (stroke) {
+                      setState(() => _hasUnsavedChanges = true);
+                      bloc.add(AddStrokeEvent(stroke));
+                    },
+                    onUndo: () {
+                      setState(() => _hasUnsavedChanges = true);
+                      bloc.add(const UndoEvent());
+                    },
+                    onRedo: () {
+                      setState(() => _hasUnsavedChanges = true);
+                      bloc.add(const RedoEvent());
+                    },
                   ),
                 ),
 
