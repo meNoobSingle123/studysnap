@@ -54,7 +54,9 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
 
   Future<void> _pick(ImageSource source) async {
     final file = await _picker.pickImage(source: source);
-    if (file == null) return;
+    if (file == null) {
+      return;
+    }
     setState(() {
       _imagePath = file.path;
       _result = null;
@@ -63,11 +65,17 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     });
     try {
       final r = await _service.recognize(file.path);
-      if (mounted) setState(() => _result = r);
+      if (mounted) {
+        setState(() => _result = r);
+      }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Không nhận diện được: $e');
+      if (mounted) {
+        setState(() => _error = 'Không nhận diện được: $e');
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 

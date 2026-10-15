@@ -33,13 +33,17 @@ class Building {
 /// CĐ 9: lấy vị trí GPS, tìm tòa nhà gần nhất, mở Google Maps chỉ đường đi bộ.
 class _LocationService {
   Future<Position?> currentPosition() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return null;
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return null;
+    }
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.denied ||
-        perm == LocationPermission.deniedForever) return null;
+        perm == LocationPermission.deniedForever) {
+      return null;
+    }
     return Geolocator.getCurrentPosition(
       locationSettings:
           const LocationSettings(accuracy: LocationAccuracy.high),
@@ -103,7 +107,9 @@ class _CampusMapPageState extends State<CampusMapPage> {
       _status = 'Đang lấy vị trí...';
     });
     final pos = await _loc.currentPosition();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     if (pos == null) {
       setState(() {
         _loading = false;
