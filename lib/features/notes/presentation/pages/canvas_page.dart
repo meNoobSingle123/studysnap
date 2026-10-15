@@ -98,7 +98,9 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
   }
 
   Future<bool> _confirmDiscard(CanvasState state) async {
-    if (!_hasUnsavedChanges) return true;
+    if (!_hasUnsavedChanges) {
+      return true;
+    }
 
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -136,7 +138,9 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
         return PopScope(
           canPop: !_hasUnsavedChanges,
           onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
+            if (didPop) {
+              return;
+            }
             final canLeave = await _confirmDiscard(state);
             if (canLeave && context.mounted) {
               Navigator.of(context).pop();
@@ -173,7 +177,10 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                   child: CanvasDrawingBoard(
                     strokes: state.strokes,
                     originalImageSize: widget.originalImageSize,
-                    backgroundImage: widget.backgroundImage,
+                    backgroundImage: widget.backgroundImage != null
+                        ? Image.memory(widget.backgroundImage!,
+                            fit: BoxFit.contain)
+                        : null,
                     activeTool: state.selectedTool,
                     activeColor: Color(state.selectedColor),
                     activeWidthScene: state.strokeWidth,

@@ -97,19 +97,25 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
   // ---------------------------------------------------------------------------
 
   void _onPanStart(DragStartDetails details) {
-    if (_mode != CanvasMode.draw) return;
+    if (_mode != CanvasMode.draw) {
+      return;
+    }
     _activePoints.value = [];
     _scenePointsBuffer.clear();
     _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    if (_mode != CanvasMode.draw) return;
+    if (_mode != CanvasMode.draw) {
+      return;
+    }
     _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
   }
 
   void _onPanEnd(DragEndDetails _) {
-    if (_mode != CanvasMode.draw) return;
+    if (_mode != CanvasMode.draw) {
+      return;
+    }
     _finalizeStroke();
   }
 

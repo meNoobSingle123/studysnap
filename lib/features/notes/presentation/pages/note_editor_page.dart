@@ -71,11 +71,15 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   }
 
   void _onBodyTextChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _saveIfUnsaved() {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final bloc = context.read<NoteEditorBloc>();
     if (bloc.state is NoteEditorLoaded) {
       final state = bloc.state as NoteEditorLoaded;
@@ -95,7 +99,9 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   }
 
   Future<void> _handleBackNavigation() async {
-    if (_isExiting) return;
+    if (_isExiting) {
+      return;
+    }
     _isExiting = true;
 
     try {
@@ -197,7 +203,9 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
         return PopScope(
           canPop: _canPop,
           onPopInvokedWithResult: (didPop, result) async {
-            if (didPop) return;
+            if (didPop) {
+              return;
+            }
             await _handleBackNavigation();
           },
           child: Scaffold(
