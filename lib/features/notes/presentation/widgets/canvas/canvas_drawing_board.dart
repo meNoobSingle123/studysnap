@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../core/l10n/strings.dart';
+import 'package:nhom_7/core/l10n/strings.dart';
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/utils/canvas_math_util.dart';
 import 'active_stroke_painter.dart';
