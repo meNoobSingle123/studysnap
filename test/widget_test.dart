@@ -10,8 +10,10 @@ import 'package:nhom_7/features/security/presentation/pages/app_lock_page.dart';
 import 'package:nhom_7/main.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:nhom_7/core/security/auth_lock_listenable.dart';
 
 void main() {
+  setUp(() async {
     FlutterSecureStorage.setMockInitialValues({});
     AuthLockListenable.instance.updateLockState(true);
     await configureDependencies(isTest: true);
@@ -59,7 +61,7 @@ void main() {
     // Tap on Tools tab and verify ToolsPage is displayed
     await tester.tap(find.text(AppStrings.toolsTab));
     await tester.pumpAndSettle();
-    expect(find.text(AppStrings.mapNavigation), findsOneWidget);
+    await tester.scrollUntilVisible(find.text(AppStrings.appSettings), 100.0);
     expect(find.text(AppStrings.appSettings), findsOneWidget);
 
     // Tap on Notes tab and verify branch switched

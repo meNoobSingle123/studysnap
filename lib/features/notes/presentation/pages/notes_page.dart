@@ -212,12 +212,13 @@ class _NotesPageState extends State<NotesPage> {
                     },
                   ),
                 ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           final newNoteId = const Uuid().v4();
           _openNoteEditor(newNoteId);
         },
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.createNote),
       ),
     );
   }
@@ -477,7 +478,7 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
                   itemCount: state.filteredNotes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final note = state.filteredNotes[index];
                     final subject = state.subjectsMap[note.subjectId];
@@ -495,12 +496,13 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           final newNoteId = const Uuid().v4();
           context.push(Routes.noteEdit(newNoteId));
         },
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.createNote),
       ),
     );
   }
