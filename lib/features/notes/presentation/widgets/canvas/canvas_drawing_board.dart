@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:nhom_7/core/l10n/strings.dart';
 import '../../../domain/entities/stroke.dart';
-import '../../../domain/utils/canvas_math_util.dart';
+import '../../../domain/utils/stroke_math.dart';
 import 'active_stroke_painter.dart';
 import 'completed_strokes_painter.dart';
 
