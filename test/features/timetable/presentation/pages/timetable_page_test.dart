@@ -58,4 +58,123 @@ void main() {
       expect(find.text('Học kỳ: 2026-1'), findsOneWidget);
     });
   });
+
+  group('AddSlotBottomSheet Widget & Recurring Tests', () {
+    testWidgets('renders all input fields and Google Calendar repeat elements',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AddSlotBottomSheet(
+              initialDate: DateTime(2026, 10, 16),
+              onSave: ({
+                required String subjectName,
+                required String room,
+                String? building,
+                required DateTime startDate,
+                required TimeOfDay startTime,
+                required TimeOfDay endTime,
+                required int repeatWeeks,
+              }) async {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('add_slot_subject_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_room_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_building_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_date_picker')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_start_time_picker')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_end_time_picker')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_repeat_weeks_dropdown')), findsOneWidget);
+      expect(find.byKey(const ValueKey('add_slot_submit_button')), findsOneWidget);
+      expect(find.text('Thêm ca học lặp lại'), findsOneWidget);
+      expect(find.text('Chuẩn Google Calendar (lặp theo tuần)'), findsOneWidget);
+    });
+
+    testWidgets('shows validation errors when submitting with empty fields',
+        (tester) async {
+      bool onSaveCalled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AddSlotBottomSheet(
+              initialDate: DateTime(2026, 10, 16),
+              onSave: ({
+                required String subjectName,
+                required String room,
+                String? building,
+                required DateTime startDate,
+                required TimeOfDay startTime,
+                required TimeOfDay endTime,
+                required int repeatWeeks,
+              }) async {
+                onSaveCalled = true;
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('add_slot_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(onSaveCalled, isFalse);
+      expect(find.text('Vui lòng nhập tên môn học'), findsOneWidget);
+      expect(find.text('Vui lòng nhập phòng'), findsOneWidget);
+    });
+
+    testWidgets(
+        'valid input calls onSave with correct parameters and recurrence weeks',
+        (tester) async {
+      String? savedSubject;
+      String? savedRoom;
+      int? savedRepeatWeeks;
+      DateTime? savedStartDate;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AddSlotBottomSheet(
+              initialDate: DateTime(2026, 10, 16),
+              onSave: ({
+                required String subjectName,
+                required String room,
+                String? building,
+                required DateTime startDate,
+                required TimeOfDay startTime,
+                required TimeOfDay endTime,
+                required int repeatWeeks,
+              }) async {
+                savedSubject = subjectName;
+                savedRoom = room;
+                savedRepeatWeeks = repeatWeeks;
+                savedStartDate = startDate;
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('add_slot_subject_field')),
+        'Lập trình di động',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('add_slot_room_field')),
+        'H2.304',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('add_slot_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(savedSubject, equals('Lập trình di động'));
+      expect(savedRoom, equals('H2.304'));
+      expect(savedRepeatWeeks, equals(5));
+      expect(savedStartDate, equals(DateTime(2026, 10, 16)));
+    });
+  });
 }

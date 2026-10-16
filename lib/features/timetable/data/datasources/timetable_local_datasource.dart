@@ -138,24 +138,37 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
 
   @override
   Stream<List<TimetableSlotModel>> watchSlotsByDay(int dayOfWeek) async* {
+    if (_slotsBox == null) {
+      yield [];
+      return;
+    }
     yield _filterSlotsByDay(dayOfWeek);
     yield* _slBox.watch().map((_) => _filterSlotsByDay(dayOfWeek));
   }
 
   @override
   Stream<List<TimetableSlotModel>> watchAllSlots() async* {
+    if (_slotsBox == null) {
+      yield [];
+      return;
+    }
     yield _filterAllActiveSlots();
     yield* _slBox.watch().map((_) => _filterAllActiveSlots());
   }
 
   @override
   Stream<List<SubjectModel>> watchSubjects() async* {
+    if (_subjectsBox == null) {
+      yield [];
+      return;
+    }
     yield _filterActiveSubjects();
     yield* _sBox.watch().map((_) => _filterActiveSubjects());
   }
 
   @override
   Future<List<SubjectModel>> getSubjects() async {
+    if (_subjectsBox == null) return [];
     return _filterActiveSubjects();
   }
 

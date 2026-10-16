@@ -488,7 +488,12 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
                     return _NoteCard(
                       note: note,
                       subject: subject,
-                      onTap: () => context.push(Routes.noteEdit(note.id)),
+                      onTap: () async {
+                        await context.push(Routes.noteEdit(note.id));
+                        if (context.mounted) {
+                          context.read<NoteListBloc>().add(const LoadNotesStarted());
+                        }
+                      },
                       onDelete: () => _confirmDelete(context, note.id),
                     );
                   },
@@ -499,14 +504,18 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+        onPressed: () async {
           final newNoteId = const Uuid().v4();
-          context.push(Routes.noteEdit(newNoteId));
+          await context.push(Routes.noteEdit(newNoteId));
+          if (context.mounted) {
+            context.read<NoteListBloc>().add(const LoadNotesStarted());
+          }
         },
         icon: const Icon(Icons.add),
         label: const Text(AppStrings.createNote),
       ),
     );
+
   }
 
   void _confirmDelete(BuildContext context, String noteId) {

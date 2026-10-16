@@ -1,7 +1,10 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/app_exception.dart';
@@ -10,6 +13,7 @@ import '../../../../core/router/routes.dart';
 import '../../data/datasources/timetable_remote_data_source.dart';
 import '../../domain/entities/subject.dart';
 import '../../domain/entities/timetable_slot.dart';
+import '../../domain/repositories/timetable_repository.dart';
 import '../../domain/usecases/get_subjects_usecase.dart';
 import '../../domain/usecases/get_timetable_slots_usecase.dart';
 import '../bloc/timetable_bloc.dart';
@@ -100,7 +104,9 @@ class _TimetablePageState extends State<TimetablePage> {
       create: (context) => TimetableBloc(
         slotsUseCase: getIt<GetTimetableSlotsUseCase>(),
         subjectsUseCase: getIt<GetSubjectsUseCase>(),
-      )..add(DaySelectedEvent(DateTime.now())),
+      )
+        ..add(const InitTimetableSubscription())
+        ..add(DaySelectedEvent(DateTime.now())),
       child: Builder(
         builder: (blocContext) => _TimetableView(
           onSync: () => _syncTimetable(blocContext),
@@ -343,9 +349,16 @@ class _TimetableViewState extends State<_TimetableView> {
                         });
                       },
                       eventLoader: (day) {
-                        return loaded.allSlots
-                            .where((s) => s.dayOfWeek == day.weekday)
-                            .toList();
+                        final dayOnly = DateTime(day.year, day.month, day.day);
+                        return loaded.allSlots.where((s) {
+                          if (s.isDeleted || s.dayOfWeek != day.weekday) return false;
+                          final startOnly = DateTime(
+                              s.termStart.year, s.termStart.month, s.termStart.day);
+                          final endOnly = DateTime(
+                              s.termEnd.year, s.termEnd.month, s.termEnd.day);
+                          return !dayOnly.isBefore(startOnly) &&
+                              !dayOnly.isAfter(endOnly);
+                        }).toList();
                       },
                       calendarStyle: CalendarStyle(
                         todayDecoration: BoxDecoration(
@@ -443,6 +456,13 @@ class _TimetableViewState extends State<_TimetableView> {
             ),
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('add_slot_fab'),
+        heroTag: null,
+        onPressed: () => _showAddSlotModal(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Thêm ca học'),
       ),
     );
   }
@@ -696,6 +716,576 @@ class _TimetableViewState extends State<_TimetableView> {
       default:
         return '';
     }
+  }
+
+  Future<void> _showAddSlotModal(BuildContext context) async {
+    final bloc = context.read<TimetableBloc>();
+    final currentSelectedDay = bloc.state is TimetableLoaded
+        ? (bloc.state as TimetableLoaded).selectedDay
+        : _focusedDay;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (bottomSheetContext) => AddSlotBottomSheet(
+        initialDate: currentSelectedDay,
+        onSave: ({
+          required String subjectName,
+          required String room,
+          String? building,
+          required DateTime startDate,
+          required TimeOfDay startTime,
+          required TimeOfDay endTime,
+          required int repeatWeeks,
+        }) async {
+          await _handleSaveSlot(
+            context: context,
+            subjectName: subjectName,
+            room: room,
+            building: building,
+            startDate: startDate,
+            startTime: startTime,
+            endTime: endTime,
+            repeatWeeks: repeatWeeks,
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _handleSaveSlot({
+    required BuildContext context,
+    required String subjectName,
+    required String room,
+    String? building,
+    required DateTime startDate,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    required int repeatWeeks,
+  }) async {
+    final repo = getIt<TimetableRepository>();
+    final existingSubjects = await repo.getSubjects();
+
+    Subject? subject = existingSubjects.cast<Subject?>().firstWhere(
+      (s) =>
+          s != null &&
+          s.name.trim().toLowerCase() == subjectName.trim().toLowerCase(),
+      orElse: () => null,
+    );
+
+    final now = DateTime.now();
+    if (subject == null) {
+      final subId = const Uuid().v4();
+      final cleanName = subjectName.replaceAll(' ', '');
+      final code = cleanName.length >= 3
+          ? cleanName
+              .substring(0, math.min(6, cleanName.length))
+              .toUpperCase()
+          : 'MH${now.millisecondsSinceEpoch % 1000}';
+      subject = Subject(
+        id: subId,
+        code: code,
+        name: subjectName,
+        credits: 3,
+        colorArgb: 0xFF1E88E5,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await repo.saveSubject(subject);
+    }
+
+    final startMin = startTime.hour * 60 + startTime.minute;
+    final endMin = endTime.hour * 60 + endTime.minute;
+    final slotsToSave = <TimetableSlot>[];
+
+    for (int i = 0; i < repeatWeeks; i++) {
+      final currentDate = startDate.add(Duration(days: 7 * i));
+      final dateOnly =
+          DateTime(currentDate.year, currentDate.month, currentDate.day);
+
+      slotsToSave.add(
+        TimetableSlot(
+          id: const Uuid().v4(),
+          subjectId: subject.id,
+          dayOfWeek: currentDate.weekday,
+          startMin: startMin,
+          endMin: endMin,
+          room: room,
+          buildingId: building,
+          termStart: dateOnly,
+          termEnd: dateOnly,
+          source: 'user',
+          updatedAt: now,
+        ),
+      );
+    }
+
+    await repo.saveSlots(slotsToSave);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã thêm $repeatWeeks ca học môn "$subjectName" thành công!',
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+}
+
+/// Form nhập ca học trượt từ dưới lên (BottomSheet) với thuật toán lặp tuần chuẩn Google Calendar.
+class AddSlotBottomSheet extends StatefulWidget {
+  final DateTime initialDate;
+  final Future<void> Function({
+    required String subjectName,
+    required String room,
+    String? building,
+    required DateTime startDate,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    required int repeatWeeks,
+  }) onSave;
+
+  const AddSlotBottomSheet({
+    super.key,
+    required this.initialDate,
+    required this.onSave,
+  });
+
+  @override
+  State<AddSlotBottomSheet> createState() => _AddSlotBottomSheetState();
+}
+
+class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _subjectController;
+  late final TextEditingController _roomController;
+  late final TextEditingController _buildingController;
+
+  late DateTime _startDate;
+  TimeOfDay _startTime = const TimeOfDay(hour: 7, minute: 30);
+  TimeOfDay _endTime = const TimeOfDay(hour: 9, minute: 30);
+  int _repeatWeeks = 5;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _subjectController = TextEditingController();
+    _roomController = TextEditingController();
+    _buildingController = TextEditingController();
+    _startDate = widget.initialDate;
+  }
+
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    _roomController.dispose();
+    _buildingController.dispose();
+    super.dispose();
+  }
+
+  String _formatWeekdayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Thứ Hai';
+      case DateTime.tuesday:
+        return 'Thứ Ba';
+      case DateTime.wednesday:
+        return 'Thứ Tư';
+      case DateTime.thursday:
+        return 'Thứ Năm';
+      case DateTime.friday:
+        return 'Thứ Sáu';
+      case DateTime.saturday:
+        return 'Thứ Bảy';
+      case DateTime.sunday:
+        return 'Chủ Nhật';
+      default:
+        return '';
+    }
+  }
+
+  String _formatTime(TimeOfDay t) {
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime(2025),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked;
+      });
+    }
+  }
+
+  Future<void> _pickStartTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _startTime,
+    );
+    if (picked != null) {
+      setState(() {
+        _startTime = picked;
+      });
+    }
+  }
+
+  Future<void> _pickEndTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        _endTime = picked;
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    if (startMinutes >= endMinutes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Giờ kết thúc phải sau giờ bắt đầu'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await widget.onSave(
+        subjectName: _subjectController.text.trim(),
+        room: _roomController.text.trim(),
+        building: _buildingController.text.trim().isNotEmpty
+            ? _buildingController.text.trim()
+            : null,
+        startDate: _startDate,
+        startTime: _startTime,
+        endTime: _endTime,
+        repeatWeeks: _repeatWeeks,
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final endDate = _startDate.add(Duration(days: 7 * (_repeatWeeks - 1)));
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Thanh kéo drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Tiêu đề BottomSheet
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.event_repeat_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Thêm ca học lặp lại',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Chuẩn Google Calendar (lặp theo tuần)',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Nhập Tên môn học
+              TextFormField(
+                key: const ValueKey('add_slot_subject_field'),
+                controller: _subjectController,
+                decoration: const InputDecoration(
+                  labelText: 'Tên môn học *',
+                  hintText: 'VD: Lập trình Flutter',
+                  prefixIcon: Icon(Icons.menu_book_rounded),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Vui lòng nhập tên môn học';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Hàng Phòng học & Tòa nhà
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: TextFormField(
+                      key: const ValueKey('add_slot_room_field'),
+                      controller: _roomController,
+                      decoration: const InputDecoration(
+                        labelText: 'Phòng học *',
+                        hintText: 'VD: H2.304',
+                        prefixIcon: Icon(Icons.room_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Vui lòng nhập phòng';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      key: const ValueKey('add_slot_building_field'),
+                      controller: _buildingController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tòa nhà',
+                        hintText: 'VD: H2',
+                        prefixIcon: Icon(Icons.business_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Ngày bắt đầu
+              InkWell(
+                key: const ValueKey('add_slot_date_picker'),
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(8),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Ngày bắt đầu *',
+                    prefixIcon: Icon(Icons.calendar_today_rounded),
+                    suffixIcon: Icon(Icons.arrow_drop_down),
+                    border: OutlineInputBorder(),
+                  ),
+                  child: Text(
+                    '${DateFormat('dd/MM/yyyy').format(_startDate)} (${_formatWeekdayName(_startDate.weekday)})',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Khung chọn Giờ bắt đầu & Giờ kết thúc
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      key: const ValueKey('add_slot_start_time_picker'),
+                      onTap: _pickStartTime,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Giờ bắt đầu *',
+                          prefixIcon: Icon(Icons.access_time_rounded),
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Text(
+                          _formatTime(_startTime),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      key: const ValueKey('add_slot_end_time_picker'),
+                      onTap: _pickEndTime,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Giờ kết thúc *',
+                          prefixIcon: Icon(Icons.access_time_filled_rounded),
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Text(
+                          _formatTime(_endTime),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Dropdown số tuần học lặp lại
+              DropdownButtonFormField<int>(
+                key: const ValueKey('add_slot_repeat_weeks_dropdown'),
+                initialValue: _repeatWeeks,
+                decoration: const InputDecoration(
+                  labelText: 'Số tuần lặp lại (Google Calendar) *',
+                  prefixIcon: Icon(Icons.repeat_rounded),
+                  border: OutlineInputBorder(),
+                ),
+                items: List.generate(15, (index) => index + 1).map((week) {
+                  return DropdownMenuItem<int>(
+                    value: week,
+                    child: Text('$week tuần ($week ca học)'),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _repeatWeeks = val;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Hộp tóm tắt chu kỳ học
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color:
+                        theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Sẽ tạo $_repeatWeeks ca học vào lúc ${_formatTime(_startTime)} - ${_formatTime(_endTime)} mỗi ${_formatWeekdayName(_startDate.weekday)} từ ${DateFormat('dd/MM/yyyy').format(_startDate)} đến ${DateFormat('dd/MM/yyyy').format(endDate)}.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Nút Lưu
+              FilledButton.icon(
+                key: const ValueKey('add_slot_submit_button'),
+                onPressed: _isSaving ? null : _submit,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_rounded),
+                label: Text(
+                  _isSaving ? 'Đang lưu trữ...' : 'Lưu ca học',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

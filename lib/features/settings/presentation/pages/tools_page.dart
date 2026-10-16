@@ -109,80 +109,93 @@ class _ToolsPageState extends State<ToolsPage> {
     }
   }
 
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+      child: Text(
+        title,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.outline,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.toolsTab),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
         children: [
-          // Security / Biometrics Lock Switch
-          Card(
-            child: SwitchListTile(
-              secondary: const Icon(Icons.fingerprint),
-              title: const Text(AppStrings.biometricLockTitle),
-              subtitle: const Text(AppStrings.biometricLockSubtitle),
-              value: _isLockEnabled,
-              onChanged: _onToggleLock,
-            ),
+          // NHÓM HỌC TẬP
+          _buildSectionHeader(context, 'HỌC TẬP'),
+          ListTile(
+            leading: const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text(AppStrings.pdfExportTitle),
+            subtitle: const Text('Xuất Thời khóa biểu & Ghi chú A4'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(Routes.pdfExport),
           ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.qr_code_scanner_rounded),
-              title: const Text(AppStrings.scannerTitle),
-              subtitle: const Text('Quét tài liệu và chụp ảnh bài giảng (S08)'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(Routes.scanner),
-            ),
+          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ListTile(
+            leading: const Icon(Icons.qr_code_scanner_outlined),
+            title: const Text(AppStrings.scannerTitle),
+            subtitle: const Text('Quét tài liệu và chụp ảnh bài giảng'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(Routes.scanner),
           ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.picture_as_pdf_rounded),
-              title: const Text(AppStrings.pdfExportTitle),
-              subtitle: const Text('Xuất Thời khóa biểu & Ghi chú A4 (S09)'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(Routes.pdfExport),
-            ),
+
+          // NHÓM HỆ THỐNG
+          _buildSectionHeader(context, 'HỆ THỐNG'),
+          ListTile(
+            leading: const Icon(Icons.notifications_active_outlined),
+            title: const Text(AppStrings.notificationTitle),
+            subtitle: const Text('Lên lịch nhắc tự động trước ca học'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(Routes.notifications),
           ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.notifications_active_rounded),
-              title: const Text(AppStrings.notificationTitle),
-              subtitle: const Text('Lên lịch nhắc tự động 15 phút trước ca học (CĐ 7)'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(Routes.notifications),
-            ),
+          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ListTile(
+            leading: const Icon(Icons.map_outlined),
+            title: const Text(AppStrings.mapNavigation),
+            subtitle: const Text('Xem đường đi tới các tòa nhà trong trường'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              // S10: Campus map navigation shortcut
+            },
           ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.map_outlined),
-              title: const Text(AppStrings.mapNavigation),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                // S10: Campus map navigation shortcut
-              },
-            ),
+          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ListTile(
+            leading: const Icon(Icons.settings_outlined),
+            title: const Text(AppStrings.appSettings),
+            subtitle: const Text('Cấu hình ứng dụng và lưu trữ'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              // S13: System settings shortcut
+            },
           ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text(AppStrings.appSettings),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                // S13: System settings shortcut
-              },
-            ),
+
+          // NHÓM BẢO MẬT
+          _buildSectionHeader(context, 'BẢO MẬT'),
+          SwitchListTile(
+            secondary: const Icon(Icons.fingerprint),
+            title: const Text(AppStrings.biometricLockTitle),
+            subtitle: const Text(AppStrings.biometricLockSubtitle),
+            value: _isLockEnabled,
+            onChanged: _onToggleLock,
           ),
         ],
       ),
     );
   }
 }
+
 

@@ -200,9 +200,21 @@ class TimetableBloc extends Bloc<TimetableEvent, TimetableState> {
 
   TimetableLoaded _createLoadedState() {
     final weekday = _currentSelectedDay.weekday; // 1=T2 .. 7=CN
-    final daySlots = _cachedSlots
-        .where((s) => s.dayOfWeek == weekday && !s.isDeleted)
-        .toList()
+    final selectedDateOnly = DateTime(
+      _currentSelectedDay.year,
+      _currentSelectedDay.month,
+      _currentSelectedDay.day,
+    );
+
+    final daySlots = _cachedSlots.where((s) {
+      if (s.isDeleted || s.dayOfWeek != weekday) return false;
+      final startOnly =
+          DateTime(s.termStart.year, s.termStart.month, s.termStart.day);
+      final endOnly =
+          DateTime(s.termEnd.year, s.termEnd.month, s.termEnd.day);
+      return !selectedDateOnly.isBefore(startOnly) &&
+          !selectedDateOnly.isAfter(endOnly);
+    }).toList()
       ..sort((a, b) => a.startMin.compareTo(b.startMin));
 
     // Tính ca học tiếp theo trong ngày
