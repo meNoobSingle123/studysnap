@@ -17,6 +17,8 @@ abstract final class AppStrings {
   static const String edit = 'Chỉnh sửa';
   static const String retry = 'Thử lại';
   static const String close = 'Đóng';
+  static const String search = 'Tìm kiếm';
+
   // Timetable Feature (S02, CĐ 2, Chương 5)
   static const String syncTimetable = 'Đồng bộ';
   static const String syncingTimetable = 'Đang đồng bộ lịch học...';
@@ -93,6 +95,7 @@ abstract final class AppStrings {
   // Tools & Settings Feature (S10, S13)
   static const String toolsTitle = 'Công cụ & Cài đặt';
   static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
+  static const String ocrScanner = 'Nhận diện chữ từ ảnh (OCR)';
   static const String appSettings = 'Cài đặt hệ thống';
 
   // State Messages

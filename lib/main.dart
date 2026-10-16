@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import 'core/di/injection.dart';
@@ -23,6 +24,60 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       routerConfig: AppRouter.router,
+      // Banner mất mạng xuất hiện trên mọi màn hình (CĐ 5)
+      builder: (context, child) => ConnectivityBanner(child: child!),
+    );
+  }
+}
+
+// ── Connectivity Banner (CĐ 5) ─────────────────────────────────────────────
+/// Hiện banner "Mất kết nối" ở đầu màn khi không có mạng.
+class ConnectivityBanner extends StatelessWidget {
+  final Widget child;
+  const ConnectivityBanner({super.key, required this.child});
+
+  static bool _isOnline(List<ConnectivityResult> r) =>
+      r.any((e) => e != ConnectivityResult.none);
+
+  Stream<bool> get _online async* {
+    final c = Connectivity();
+    yield _isOnline(await c.checkConnectivity());
+    yield* c.onConnectivityChanged.map(_isOnline);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<bool>(
+      stream: _online,
+      initialData: true,
+      builder: (context, snap) {
+        final online = snap.data ?? true;
+        return Column(children: [
+          if (!online)
+            Material(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 6),
+                  child: Row(children: [
+                    const Icon(Icons.wifi_off, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Mất kết nối internet',
+                      style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onErrorContainer),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          Expanded(child: child),
+        ]);
+      },
     );
   }
 }

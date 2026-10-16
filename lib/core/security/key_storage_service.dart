@@ -10,6 +10,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Phục vụ cung cấp khóa bảo mật cho HiveAesCipher của CSDL cục bộ.
 class KeyStorageService {
   static const String kDbEncryptionKeyName = 'db_encryption_key_v1';
+  static const String kAppLockEnabledKey = 'is_app_lock_enabled';
 
   final FlutterSecureStorage _storage;
 
@@ -49,8 +50,6 @@ class KeyStorageService {
   Future<bool> hasEncryptionKey() async {
     return _storage.containsKey(key: kDbEncryptionKeyName);
   }
-
-  static const String kAppLockEnabledKey = 'is_app_lock_enabled';
 
   /// Kiểm tra xem tính năng khóa sinh trắc học có đang được bật không.
   /// Mặc định là false để vào app trực tiếp không bị chặn.

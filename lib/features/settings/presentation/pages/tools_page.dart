@@ -5,6 +5,8 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/security/auth_lock_listenable.dart';
 import '../../../../core/security/key_storage_service.dart';
+import '../../../maps/campus_map_page.dart';
+import '../../../ocr/ocr_scanner_page.dart';
 
 class ToolsPage extends StatefulWidget {
   final KeyStorageService? keyStorageService;
@@ -24,6 +26,9 @@ class _ToolsPageState extends State<ToolsPage> {
   late final KeyStorageService _keyStorage;
   late final LocalAuthentication _localAuth;
   bool _isLockEnabled = false;
+
+  void _go(BuildContext context, Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
   @override
   void initState() {
@@ -127,17 +132,29 @@ class _ToolsPageState extends State<ToolsPage> {
             ),
           ),
           const SizedBox(height: 12),
+          // Campus Map
           Card(
             child: ListTile(
               leading: const Icon(Icons.map_outlined),
               title: const Text(AppStrings.mapNavigation),
+              subtitle: const Text('Chỉ đường đi bộ đến tòa nhà trong khuôn viên'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                // S10: Campus map navigation shortcut
-              },
+              onTap: () => _go(context, const CampusMapPage()),
             ),
           ),
           const SizedBox(height: 12),
+          // OCR Scanner
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.document_scanner_outlined),
+              title: const Text(AppStrings.ocrScanner),
+              subtitle: const Text('Chụp/chọn ảnh để nhận diện chữ in tự động'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _go(context, const OcrScannerPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // App Settings
           Card(
             child: ListTile(
               leading: const Icon(Icons.settings_outlined),

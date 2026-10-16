@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../data/repositories/in_memory_note_repository.dart';
 import '../../domain/entities/lecture_note.dart';
 import '../../domain/repositories/note_repository.dart';
 
@@ -29,7 +30,7 @@ class _NotesPageState extends State<NotesPage> {
     _repository = widget.repository ??
         (getIt.isRegistered<NoteRepository>()
             ? getIt<NoteRepository>()
-            : getIt<NoteRepository>());
+            : InMemoryNoteRepository());
     _loadNotes();
   }
 

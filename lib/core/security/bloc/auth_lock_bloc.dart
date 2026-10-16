@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../l10n/strings.dart';
+import '../auth_lock_listenable.dart';
 import 'auth_lock_event.dart';
 import 'auth_lock_state.dart';
 
@@ -24,6 +25,13 @@ class AuthLockBloc extends Bloc<AuthLockEvent, AuthLockState> {
     on<UnlockApp>(_onUnlockApp);
     on<AppEnteredBackground>(_onAppEnteredBackground);
     on<AppResumed>(_onAppResumed);
+  }
+
+  @override
+  void onChange(Change<AuthLockState> change) {
+    super.onChange(change);
+    AuthLockListenable.instance
+        .updateLockState(change.nextState is AuthLocked);
   }
 
   Future<void> _onCheckAuthStatus(
