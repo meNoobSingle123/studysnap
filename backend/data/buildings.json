@@ -1,0 +1,72 @@
+[
+  {
+    "id": "H2",
+    "code": "H2",
+    "name": "Tòa nhà H2 - Khu thực hành & Giảng đường",
+    "latitude": 10.87532,
+    "longitude": 106.80054
+  },
+  {
+    "id": "A1",
+    "code": "A1",
+    "name": "Tòa nhà A1 - Nhà Điều hành & Phòng Đào tạo",
+    "latitude": 10.87588,
+    "longitude": 106.80121
+  },
+  {
+    "id": "B",
+    "code": "B",
+    "name": "Tòa nhà B - Khoa Công nghệ Thông tin",
+    "latitude": 10.87495,
+    "longitude": 106.80182
+  },
+  {
+    "id": "C",
+    "code": "C",
+    "name": "Tòa nhà C - Giảng đường C1, C2",
+    "latitude": 10.87612,
+    "longitude": 106.80015
+  },
+  {
+    "id": "D",
+    "code": "D",
+    "name": "Tòa nhà D - Phòng thí nghiệm Hóa - Sinh",
+    "latitude": 10.87650,
+    "longitude": 106.80080
+  },
+  {
+    "id": "E",
+    "code": "E",
+    "name": "Tòa nhà E - Giảng đường E1",
+    "latitude": 10.87460,
+    "longitude": 106.80210
+  },
+  {
+    "id": "F",
+    "code": "F",
+    "name": "Tòa nhà F - Khoa Điện tử Viễn thông",
+    "latitude": 10.87410,
+    "longitude": 106.80250
+  },
+  {
+    "id": "I",
+    "code": "I",
+    "name": "Tòa nhà I - Khu Trung tâm Đổi mới Sáng tạo",
+    "latitude": 10.87700,
+    "longitude": 106.80150
+  },
+  {
+    "id": "K",
+    "code": "K",
+    "name": "Tòa nhà K - Khu Ký túc xá & Thể thao",
+    "latitude": 10.87810,
+    "longitude": 106.80300
+  },
+  {
+    "id": "LIB",
+    "code": "LIB",
+    "name": "Thư viện Trung tâm ĐHQG-HCM",
+    "latitude": 10.87320,
+    "longitude": 106.79980
+  }
+]

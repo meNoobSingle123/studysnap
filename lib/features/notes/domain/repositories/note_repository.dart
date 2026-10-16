@@ -8,6 +8,13 @@ abstract class NoteRepository {
   /// Saves or updates a lecture note.
   Future<void> saveNote(LectureNote note);
 
-  /// Retrieves all saved lecture notes.
+  /// Retrieves all notes (excluding soft-deleted ones).
   Future<List<LectureNote>> getAllNotes();
+
+  /// Reactive stream of all active notes for real-time UI updates.
+  Stream<List<LectureNote>> watchAllNotes();
+
+  /// Deletes a note by its ID (soft-delete).
+  Future<void> deleteNote(String id);
 }
+

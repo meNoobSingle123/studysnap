@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
+import '../../../../core/router/routes.dart';
 import '../../../../core/security/auth_lock_listenable.dart';
 import '../../../../core/security/key_storage_service.dart';
 
@@ -129,6 +131,36 @@ class _ToolsPageState extends State<ToolsPage> {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
+              leading: const Icon(Icons.qr_code_scanner_rounded),
+              title: const Text(AppStrings.scannerTitle),
+              subtitle: const Text('Quét tài liệu và chụp ảnh bài giảng (S08)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.scanner),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.picture_as_pdf_rounded),
+              title: const Text(AppStrings.pdfExportTitle),
+              subtitle: const Text('Xuất Thời khóa biểu & Ghi chú A4 (S09)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.pdfExport),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.notifications_active_rounded),
+              title: const Text(AppStrings.notificationTitle),
+              subtitle: const Text('Lên lịch nhắc tự động 15 phút trước ca học (CĐ 7)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.notifications),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
               leading: const Icon(Icons.map_outlined),
               title: const Text(AppStrings.mapNavigation),
               trailing: const Icon(Icons.chevron_right),
@@ -153,3 +185,4 @@ class _ToolsPageState extends State<ToolsPage> {
     );
   }
 }
+

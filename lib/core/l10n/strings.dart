@@ -36,6 +36,20 @@ abstract final class AppStrings {
   static const String savedStatus = 'Đã lưu';
   static const String pinnedSlot = 'Ca học';
   static const String pinnedSubject = 'Môn học';
+<<<<<<< HEAD
+=======
+  static const String searchNotesHint = 'Tìm kiếm theo tiêu đề, nội dung...';
+  static const String allSubjects = 'Tất cả môn';
+  static const String filterByDate = 'Lọc theo ngày';
+  static const String resetFilters = 'Đặt lại bộ lọc';
+  static const String noMatchingNotes = 'Không tìm thấy ghi chú nào phù hợp.';
+  static const String sortNewest = 'Mới nhất';
+  static const String sortOldest = 'Cũ nhất';
+  static const String sortTitleAz = 'Tên (A-Z)';
+  static const String deleteNoteConfirmTitle = 'Xóa ghi chú?';
+  static const String deleteNoteConfirmMessage = 'Ghi chú này sẽ bị xóa khỏi danh sách. Bạn có chắc chắn muốn xóa?';
+  static const String untitledNote = 'Ghi chú không tiêu đề';
+>>>>>>> origin/feature/huy-tasks
 
   // Canvas Drawing (S07)
   static const String canvasPageTitle = 'Bản vẽ ghi chú';
@@ -95,10 +109,94 @@ abstract final class AppStrings {
   static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
   static const String appSettings = 'Cài đặt hệ thống';
 
+  // Scanner & Camera Feature (S08, CĐ 10)
+  static const String scannerTitle = 'Camera & Quét mã QR';
+  static const String qrScannerTab = 'Quét mã QR';
+  static const String cameraCaptureTab = 'Chụp ảnh bài giảng';
+  static const String scanQrPrompt = 'Hướng camera về phía mã QR tài liệu';
+  static const String invalidQrCode =
+      'Mã QR không hợp lệ. Chỉ chấp nhận mã có định dạng studysnap://doc?url=https://...';
+  static const String insecureHttpBlocked =
+      'Liên kết bị từ chối vì không sử dụng giao thức HTTPS bảo mật.';
+  static const String qrDocumentConfirmTitle = 'Xác nhận mở tài liệu';
+  static const String qrDocumentConfirmMessage =
+      'Bạn có muốn mở tài liệu từ tên miền:';
+  static const String openInBrowser = 'Mở trình duyệt';
+  static const String needNetworkConnection = 'Cần kết nối mạng để mở tài liệu';
+  static const String cameraPermissionRequired = 'Cần cấp quyền Camera';
+  static const String cameraPermissionGuide =
+      'Ứng dụng cần quyền Camera để chụp ảnh bài giảng và quét mã QR tài liệu. Vui lòng cấp quyền trong Cài đặt hệ thống.';
+  static const String openAppSettings = 'Mở Cài đặt';
+  static const String capturedImages = 'Ảnh bài giảng đã chụp';
+  static const String noImagesCaptured =
+      'Chưa có ảnh bài giảng nào. Bấm vào nút camera để chụp hoặc chọn ảnh.';
+  static const String takePhoto = 'Chụp ảnh';
+  static const String pickFromGallery = 'Chọn từ thư viện';
+  static const String compressingImage = 'Đang tối ưu & nén ảnh...';
+  static const String createNoteFromImage = 'Tạo ghi chú từ ảnh';
+  static const String testSampleQrCodes = 'Thử nghiệm mã QR mẫu';
+  static const String sampleValidQr1 = 'Mã hợp lệ (HCMUS Syllabus)';
+  static const String sampleValidQr2 = 'Mã hợp lệ (Google Drive)';
+  static const String sampleInvalidHttp = 'Mã không hợp lệ (HTTP không an toàn)';
+  static const String sampleInvalidScheme = 'Mã không hợp lệ (Sai Scheme)';
+
+  // Timetable Feature (S02, S03, S04)
+  static const String timetableTitle = 'Thời khóa biểu';
+  static const String nextClassCountdown = 'Ca học tiếp theo';
+  static const String noUpcomingClass = 'Không có ca học nào sắp tới hôm nay';
+  static const String noClassToday = 'Hôm nay không có ca học nào';
+  static const String gpaProjectionTitle = 'Dự phóng GPA';
+  static const String currentGpa = 'GPA hiện tại';
+  static const String completedCredits = 'Tín chỉ đã tích lũy';
+  static const String remainingCredits = 'Tín chỉ còn lại';
+  static const String targetGpa = 'GPA mục tiêu';
+  static const String calculate = 'Tính toán';
+  static const String gpaResult = 'Kết quả dự phóng';
+  static const String slotDetails = 'Chi tiết ca học';
+  static const String room = 'Phòng';
+  static const String building = 'Tòa nhà';
+  static const String credits = 'Tín chỉ';
+  static const String reminderLead = 'Nhắc nhở trước';
+  static const String getDirections = 'Chỉ đường';
+  static const String createNoteForSlot = 'Tạo ghi chú cho ca này';
+
   // State Messages
   static const String loading = 'Đang tải...';
   static const String emptyData = 'Không có dữ liệu.';
   static const String success = 'Thao tác thành công';
+
+  // Export PDF Feature (Huy - S09)
+  static const String pdfExportTitle = 'Xuất & In PDF (A4)';
+  static const String exportTimetable = 'Thời khóa biểu & Lịch thi';
+  static const String exportNotes = 'Ghi chú bài giảng';
+  static const String orientationPortrait = 'Khổ dọc (Portrait)';
+  static const String orientationLandscape = 'Khổ ngang (Landscape)';
+  static const String printPdf = 'In ấn';
+  static const String sharePdf = 'Chia sẻ PDF';
+  static const String openWithExternalApp = 'Mở ứng dụng ngoài';
+  static const String pdfGeneratedSuccess = 'Tạo file PDF thành công';
+  static const String benchmarkTitle = 'Chỉ số hiệu năng (NFR Benchmark)';
+  static const String timetablePdfHeader = 'THỜI KHÓA BIỂU & LỊCH THI HỌC KỲ';
+  static const String notePdfHeader = 'PHIẾU GHI CHÚ BÀI GIẢNG';
+  static const String institutionName = 'ĐẠI HỌC KHOA HỌC TỰ NHIÊN - ĐHQG-HCM';
+
+  // Notifications Feature (Huy - CĐ 7)
+  static const String notificationTitle = 'Thông báo & Nhắc giờ';
+  static const String notificationSettingsTitle = 'Cài đặt Nhắc giờ học (CĐ 7)';
+  static const String notificationPermissionGranted = 'Đã cấp quyền thông báo';
+  static const String notificationPermissionDenied = 'Chưa cấp quyền thông báo';
+  static const String exactAlarmPermissionTitle = 'Quyền báo giờ chính xác (Exact Alarm)';
+  static const String scheduleRollingReminders = 'Lên lịch nhắc tự động 7 ngày tới';
+  static const String scheduleSuccessMessage = 'Đã lên lịch thành công cho các ca học sắp tới';
+  static const String testNotificationTitle = 'Thử nghiệm thông báo tức thì';
+  static const String testNotificationBody = 'StudySnap: Ca học tiếp theo sẽ bắt đầu sau 15 phút tại phòng H2.304!';
+  static const String leadTimeTitle = 'Thời gian nhắc trước giờ học';
+  static const String minutesLead = 'phút';
+  static const String pendingReminders = 'Thông báo đang chờ phát';
+  static const String noPendingReminders = 'Không có thông báo nào đang chờ';
+  static const String cancelAllReminders = 'Hủy toàn bộ lịch nhắc';
+  static const String reminderChannelName = 'Nhắc nhở lịch học & lịch thi';
+  static const String reminderChannelDesc = 'Thông báo tự động nhắc trước giờ vào ca học hoặc ca thi';
 
   // Error Messages
   static const String errorNetwork = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền internet.';
@@ -108,4 +206,6 @@ abstract final class AppStrings {
   static const String errorPermission = 'Ứng dụng chưa được cấp quyền để thực hiện tính năng này.';
   static const String errorUnknown = 'Đã có lỗi không xác định xảy ra. Vui lòng thử lại.';
   static const String pageNotFound = 'Không tìm thấy trang yêu cầu.';
+  static const String errorPdfGeneration = 'Không thể tạo file PDF. Vui lòng thử lại.';
 }
+

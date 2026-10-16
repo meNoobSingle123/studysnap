@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/export/domain/models/pdf_export_models.dart';
+import '../../features/export/presentation/pages/pdf_export_page.dart';
 import '../../features/notes/presentation/pages/canvas_page.dart';
 import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
+import '../../features/notifications/presentation/pages/notification_settings_page.dart';
+import '../../features/scanner/presentation/pages/scanner_camera_page.dart';
 import '../../features/security/presentation/pages/app_lock_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
+import '../../features/timetable/presentation/pages/gpa_page.dart';
+import '../../features/timetable/presentation/pages/slot_detail_page.dart';
+
 import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../l10n/strings.dart';
 import 'routes.dart';
@@ -83,7 +90,43 @@ abstract final class AppRouter {
           return CanvasPage(noteId: noteId);
         },
       ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.gpaProjection,
+        builder: (context, state) => const GpaPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.slotDetail,
+        builder: (context, state) {
+          final slotId = state.pathParameters['id'] ?? '';
+          return SlotDetailPage(slotId: slotId);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.scanner,
+        builder: (context, state) => const ScannerCameraPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.pdfExport,
+        builder: (context, state) {
+          final noteId = state.uri.queryParameters['noteId'];
+          final type = noteId != null ? PdfExportType.note : PdfExportType.timetable;
+          return PdfExportPage(
+            initialType: type,
+            initialNoteId: noteId,
+          );
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.notifications,
+        builder: (context, state) => const NotificationSettingsPage(),
+      ),
     ],
+
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text(AppStrings.appName)),
       body: const Center(

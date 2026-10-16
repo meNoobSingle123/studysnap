@@ -58,3 +58,8 @@ skills-lock.json
 
 # Markdown documents
 *.md
+
+# Node / Backend
+node_modules/
+backend/node_modules/
+

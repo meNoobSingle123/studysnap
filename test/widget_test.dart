@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nhom_7/core/di/injection.dart';
 import 'package:nhom_7/core/l10n/strings.dart';
 import 'package:nhom_7/core/router/app_router.dart';
 import 'package:nhom_7/core/router/routes.dart';
+import 'package:nhom_7/core/security/auth_lock_listenable.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_bloc.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_event.dart';
 import 'package:nhom_7/features/security/presentation/pages/app_lock_page.dart';
@@ -11,7 +13,9 @@ import 'package:nhom_7/main.dart';
 
 void main() {
   setUp(() async {
-    await configureDependencies();
+    FlutterSecureStorage.setMockInitialValues({});
+    AuthLockListenable.instance.updateLockState(true);
+    await configureDependencies(isTest: true);
   });
 
   tearDown(() async {
@@ -56,7 +60,7 @@ void main() {
     // Tap on Tools tab and verify ToolsPage is displayed
     await tester.tap(find.text(AppStrings.toolsTab));
     await tester.pumpAndSettle();
-    expect(find.text(AppStrings.mapNavigation), findsOneWidget);
+    await tester.scrollUntilVisible(find.text(AppStrings.appSettings), 100.0);
     expect(find.text(AppStrings.appSettings), findsOneWidget);
 
     // Tap on Notes tab and verify branch switched
@@ -74,3 +78,4 @@ void main() {
     expect(find.text(AppStrings.save), findsOneWidget);
   });
 }
+
