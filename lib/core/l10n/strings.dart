@@ -36,8 +36,6 @@ abstract final class AppStrings {
   static const String savedStatus = 'Đã lưu';
   static const String pinnedSlot = 'Ca học';
   static const String pinnedSubject = 'Môn học';
-<<<<<<< HEAD
-=======
   static const String searchNotesHint = 'Tìm kiếm theo tiêu đề, nội dung...';
   static const String allSubjects = 'Tất cả môn';
   static const String filterByDate = 'Lọc theo ngày';
@@ -49,7 +47,7 @@ abstract final class AppStrings {
   static const String deleteNoteConfirmTitle = 'Xóa ghi chú?';
   static const String deleteNoteConfirmMessage = 'Ghi chú này sẽ bị xóa khỏi danh sách. Bạn có chắc chắn muốn xóa?';
   static const String untitledNote = 'Ghi chú không tiêu đề';
->>>>>>> origin/feature/huy-tasks
+
 
   // Canvas Drawing (S07)
   static const String canvasPageTitle = 'Bản vẽ ghi chú';

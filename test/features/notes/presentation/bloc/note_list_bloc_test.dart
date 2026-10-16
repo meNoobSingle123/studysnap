@@ -32,14 +32,6 @@ class _FakeTimetableRepository implements TimetableRepository {
   }
 
   @override
-  Future<List<TimetableSlot>> getSlots() async => [];
-
-  @override
-  Stream<List<TimetableSlot>> watchSlots() async* {
-    yield [];
-  }
-
-  @override
   Stream<List<TimetableSlot>> watchAllSlots() async* {
     yield [];
   }
@@ -59,9 +51,6 @@ class _FakeTimetableRepository implements TimetableRepository {
   Future<void> softDeleteSubject(String id) async {}
 
   @override
-  Future<void> saveSlot(TimetableSlot slot) async {}
-
-  @override
   Future<void> saveSlots(List<TimetableSlot> slots) async {}
 
   @override
@@ -71,15 +60,7 @@ class _FakeTimetableRepository implements TimetableRepository {
   Future<List<ExamSchedule>> getExams() async => [];
 
   @override
-  Stream<List<ExamSchedule>> watchExams() async* {
-    yield [];
-  }
-
-  @override
   Future<void> saveExams(List<ExamSchedule> exams) async {}
-
-  @override
-  Future<List<CampusBuilding>> getCampusBuildings() async => [];
 
   @override
   Future<List<CampusBuilding>> getBuildings() async => [];
@@ -87,6 +68,7 @@ class _FakeTimetableRepository implements TimetableRepository {
   @override
   Future<void> saveBuildings(List<CampusBuilding> buildings) async {}
 }
+
 
 void main() {
   late InMemoryNoteRepository noteRepository;

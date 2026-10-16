@@ -34,14 +34,6 @@ class _MockTimetableRepo implements TimetableRepository {
       subjects.where((s) => s.id == id).firstOrNull;
 
   @override
-  Future<List<TimetableSlot>> getSlots() async => [];
-
-  @override
-  Stream<List<TimetableSlot>> watchSlots() async* {
-    yield [];
-  }
-
-  @override
   Stream<List<TimetableSlot>> watchAllSlots() async* {
     yield [];
   }
@@ -61,9 +53,6 @@ class _MockTimetableRepo implements TimetableRepository {
   Future<void> softDeleteSubject(String id) async {}
 
   @override
-  Future<void> saveSlot(TimetableSlot slot) async {}
-
-  @override
   Future<void> saveSlots(List<TimetableSlot> slots) async {}
 
   @override
@@ -73,15 +62,7 @@ class _MockTimetableRepo implements TimetableRepository {
   Future<List<ExamSchedule>> getExams() async => [];
 
   @override
-  Stream<List<ExamSchedule>> watchExams() async* {
-    yield [];
-  }
-
-  @override
   Future<void> saveExams(List<ExamSchedule> exams) async {}
-
-  @override
-  Future<List<CampusBuilding>> getCampusBuildings() async => [];
 
   @override
   Future<List<CampusBuilding>> getBuildings() async => [];
@@ -89,6 +70,7 @@ class _MockTimetableRepo implements TimetableRepository {
   @override
   Future<void> saveBuildings(List<CampusBuilding> buildings) async {}
 }
+
 
 void main() {
   group('Team NotesPage Tests (Custom Repository)', () {
@@ -158,6 +140,7 @@ void main() {
       expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
 
       expect(find.text(AppStrings.emptyNotesList), findsNothing);
+    });
   });
 
   group('Huy NotesPage Tests (S05 Reactive Stream & Multi-Criteria Filtering)', () {
