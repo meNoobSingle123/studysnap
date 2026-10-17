@@ -23,6 +23,11 @@ class NoteEditorBloc extends Bloc<NoteEditorEvent, NoteEditorState> {
     on<LoadNote>(_onLoadNote);
     on<UpdateContent>(_onUpdateContent);
     on<AttachVideo>(_onAttachVideo);
+    on<AddVideo>(_onAddVideo);
+    on<RemoveVideo>(_onRemoveVideo);
+    on<UpdateLocation>(_onUpdateLocation);
+    on<AddImage>(_onAddImage);
+    on<RemoveImage>(_onRemoveImage);
     on<SaveNote>(_onSaveNote);
   }
 
@@ -69,13 +74,7 @@ class NoteEditorBloc extends Bloc<NoteEditorEvent, NoteEditorState> {
         hasUnsavedChanges: true,
       ));
 
-      // Debounce 2 seconds according to FR-09
-      _debounceTimer?.cancel();
-      _debounceTimer = Timer(autoSaveDuration, () {
-        if (!isClosed) {
-          add(const SaveNote());
-        }
-      });
+      _triggerDebouncedSave();
     }
   }
 
@@ -93,13 +92,109 @@ class NoteEditorBloc extends Bloc<NoteEditorEvent, NoteEditorState> {
         hasUnsavedChanges: true,
       ));
 
-      _debounceTimer?.cancel();
-      _debounceTimer = Timer(autoSaveDuration, () {
-        if (!isClosed) {
-          add(const SaveNote());
-        }
-      });
+      _triggerDebouncedSave();
     }
+  }
+
+  void _onAddVideo(AddVideo event, Emitter<NoteEditorState> emit) {
+    final current = state;
+    if (current is NoteEditorLoaded) {
+      if (current.note.videoPaths.contains(event.videoPath)) return;
+      final newVideos = List<String>.from(current.note.videoPaths)..add(event.videoPath);
+      final updatedNote = current.note.copyWith(
+        videoPaths: newVideos,
+        updatedAt: DateTime.now(),
+      );
+      emit(current.copyWith(
+        note: updatedNote,
+        isSaveSuccess: false,
+        hasUnsavedChanges: true,
+      ));
+
+      _triggerDebouncedSave();
+    }
+  }
+
+  void _onRemoveVideo(RemoveVideo event, Emitter<NoteEditorState> emit) {
+    final current = state;
+    if (current is NoteEditorLoaded) {
+      final newVideos = List<String>.from(current.note.videoPaths)..remove(event.videoPath);
+      final updatedNote = current.note.copyWith(
+        videoPaths: newVideos,
+        updatedAt: DateTime.now(),
+      );
+      emit(current.copyWith(
+        note: updatedNote,
+        isSaveSuccess: false,
+        hasUnsavedChanges: true,
+      ));
+
+      _triggerDebouncedSave();
+    }
+  }
+
+  void _onUpdateLocation(UpdateLocation event, Emitter<NoteEditorState> emit) {
+    final current = state;
+    if (current is NoteEditorLoaded) {
+      final updatedNote = current.note.copyWith(
+        location: event.location,
+        clearLocation: event.location == null,
+        updatedAt: DateTime.now(),
+      );
+      emit(current.copyWith(
+        note: updatedNote,
+        isSaveSuccess: false,
+        hasUnsavedChanges: true,
+      ));
+
+      _triggerDebouncedSave();
+    }
+  }
+
+  void _onAddImage(AddImage event, Emitter<NoteEditorState> emit) {
+    final current = state;
+    if (current is NoteEditorLoaded) {
+      if (current.note.imagePaths.contains(event.imagePath)) return;
+      final newImages = List<String>.from(current.note.imagePaths)..add(event.imagePath);
+      final updatedNote = current.note.copyWith(
+        imagePaths: newImages,
+        updatedAt: DateTime.now(),
+      );
+      emit(current.copyWith(
+        note: updatedNote,
+        isSaveSuccess: false,
+        hasUnsavedChanges: true,
+      ));
+
+      _triggerDebouncedSave();
+    }
+  }
+
+  void _onRemoveImage(RemoveImage event, Emitter<NoteEditorState> emit) {
+    final current = state;
+    if (current is NoteEditorLoaded) {
+      final newImages = List<String>.from(current.note.imagePaths)..remove(event.imagePath);
+      final updatedNote = current.note.copyWith(
+        imagePaths: newImages,
+        updatedAt: DateTime.now(),
+      );
+      emit(current.copyWith(
+        note: updatedNote,
+        isSaveSuccess: false,
+        hasUnsavedChanges: true,
+      ));
+
+      _triggerDebouncedSave();
+    }
+  }
+
+  void _triggerDebouncedSave() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(autoSaveDuration, () {
+      if (!isClosed) {
+        add(const SaveNote());
+      }
+    });
   }
 
   Future<void> _onSaveNote(SaveNote event, Emitter<NoteEditorState> emit) async {

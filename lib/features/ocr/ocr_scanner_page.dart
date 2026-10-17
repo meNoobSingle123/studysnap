@@ -1,9 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../../core/l10n/strings.dart';
 
 // ── Model ──────────────────────────────────────────────────────────────────
 class _OcrResult {
@@ -53,6 +56,15 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   }
 
   Future<void> _pick(ImageSource source) async {
+    if (kIsWeb) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.mobileOnlyFeature)),
+        );
+      }
+      return;
+    }
+
     final file = await _picker.pickImage(source: source);
     if (file == null) {
       return;
@@ -70,7 +82,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Không nhận diện được: $e');
+        setState(() => _error = '${AppStrings.ocrErrorPrefix}$e');
       }
     } finally {
       if (mounted) {
@@ -85,7 +97,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nhận diện chữ (OCR)')),
+      appBar: AppBar(title: const Text(AppStrings.ocrTitle)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         // Nút chụp / chọn ảnh
         Row(children: [
@@ -93,7 +105,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
             child: FilledButton.icon(
               onPressed: _busy ? null : () => _pick(ImageSource.camera),
               icon: const Icon(Icons.photo_camera),
-              label: const Text('Chụp ảnh'),
+              label: const Text(AppStrings.takePhoto),
             ),
           ),
           const SizedBox(width: 12),
@@ -101,14 +113,14 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
             child: OutlinedButton.icon(
               onPressed: _busy ? null : () => _pick(ImageSource.gallery),
               icon: const Icon(Icons.photo_library),
-              label: const Text('Thư viện'),
+              label: const Text(AppStrings.ocrGallery),
             ),
           ),
         ]),
         const SizedBox(height: 16),
 
         // Ảnh preview
-        if (_imagePath != null)
+        if (_imagePath != null && !kIsWeb)
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Image.file(File(_imagePath!),
@@ -134,17 +146,17 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
               style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           SelectableText(
-              r.text.isEmpty ? '(Không thấy chữ trong ảnh)' : r.text),
+              r.text.isEmpty ? AppStrings.ocrNoTextFound : r.text),
           const SizedBox(height: 12),
           Row(children: [
             OutlinedButton.icon(
               icon: const Icon(Icons.copy),
-              label: const Text('Sao chép'),
+              label: const Text(AppStrings.ocrCopy),
               onPressed: () {
                 HapticFeedback.lightImpact();
                 Clipboard.setData(ClipboardData(text: r.text));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã sao chép!')),
+                  const SnackBar(content: Text(AppStrings.ocrCopied)),
                 );
               },
             ),
@@ -155,7 +167,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                   widget.onInsert!(r.text);
                   Navigator.pop(context);
                 },
-                child: const Text('Chèn vào ghi chú'),
+                child: const Text(AppStrings.ocrInsertToNote),
               ),
             ],
           ]),

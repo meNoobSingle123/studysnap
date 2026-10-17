@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:nhom_7/features/notes/domain/utils/timestamp_helper.dart';
 
 import '../../../../core/di/injection.dart';
@@ -49,6 +51,7 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   late final AppLifecycleListener _lifecycleListener;
   final GlobalKey<LectureVideoPlayerState> _videoKey =
       GlobalKey<LectureVideoPlayerState>();
+  int _selectedVideoIndex = 0;
   bool _isInitialized = false;
   bool _isExiting = false;
   bool _canPop = false;
@@ -180,6 +183,111 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
     context.read<NoteEditorBloc>().add(UpdateContent(bodyText: newText));
   }
 
+  Future<void> _pickMoreVideo() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickVideo(source: ImageSource.gallery);
+      if (picked != null && mounted) {
+        context.read<NoteEditorBloc>().add(AddVideo(picked.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể chọn video: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showLocationDialog(
+      BuildContext context, String? currentLocation) async {
+    final ctrl = TextEditingController(text: currentLocation ?? '');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.place_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Vị trí học tập'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Nơi ngồi học / ghi chép',
+                hintText: 'VD: Thư viện, Lab 2, Tầng 3...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              icon: const Icon(Icons.my_location),
+              label: const Text('Lấy tọa độ GPS thực tế'),
+              onPressed: () async {
+                try {
+                  bool serviceEnabled =
+                      await Geolocator.isLocationServiceEnabled();
+                  if (!serviceEnabled) {
+                    if (dialogCtx.mounted) {
+                      ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                        const SnackBar(
+                            content: Text('Vui lòng bật định vị GPS')),
+                      );
+                    }
+                    return;
+                  }
+                  LocationPermission perm = await Geolocator.checkPermission();
+                  if (perm == LocationPermission.denied) {
+                    perm = await Geolocator.requestPermission();
+                    if (perm == LocationPermission.denied) return;
+                  }
+                  final pos = await Geolocator.getCurrentPosition(
+                    locationSettings:
+                        const LocationSettings(timeLimit: Duration(seconds: 5)),
+                  );
+                  ctrl.text =
+                      'GPS: ${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
+                } catch (_) {
+                  ctrl.text = 'GPS: Khuôn viên trường';
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          if (currentLocation != null)
+            TextButton(
+              onPressed: () {
+                context.read<NoteEditorBloc>().add(const UpdateLocation(null));
+                Navigator.of(dialogCtx).pop();
+              },
+              child:
+                  const Text('Xóa vị trí', style: TextStyle(color: Colors.red)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = ctrl.text.trim();
+              context
+                  .read<NoteEditorBloc>()
+                  .add(UpdateLocation(val.isNotEmpty ? val : null));
+              Navigator.of(dialogCtx).pop();
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
@@ -195,10 +303,6 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
       },
       builder: (context, state) {
         final isSaving = state is NoteEditorLoaded && state.isSaving;
-        final hasLinkage = state is NoteEditorLoaded &&
-            ((state.note.subjectId.isNotEmpty &&
-                    state.note.subjectId != 'general') ||
-                (state.note.slotId != null && state.note.slotId!.isNotEmpty));
 
         return PopScope(
           canPop: _canPop,
@@ -319,8 +423,13 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                 ),
               NoteEditorLoaded() => LayoutBuilder(
                   builder: (context, constraints) {
-                    final hasVideo = state.note.videoPath != null &&
-                        state.note.videoPath!.isNotEmpty;
+                    final theme = Theme.of(context);
+                    final videoList = state.note.videoPaths;
+                    final hasVideo = videoList.isNotEmpty;
+                    if (_selectedVideoIndex >= videoList.length && videoList.isNotEmpty) {
+                      _selectedVideoIndex = videoList.length - 1;
+                    }
+                    final currentActiveVideo = hasVideo ? videoList[_selectedVideoIndex] : null;
                     final timestamps =
                         TimestampHelper.extractUniqueSorted(_bodyController.text);
 
@@ -341,24 +450,144 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                                 : Alignment.topCenter,
                             child: LectureVideoPlayer(
                               key: _videoKey,
-                              videoPath: state.note.videoPath,
+                              videoPath: currentActiveVideo,
                               timestamps: timestamps,
                               isMini: isKeyboardOpen && hasVideo,
                               onVideoChanged: (newPath) {
-                                context
-                                    .read<NoteEditorBloc>()
-                                    .add(AttachVideo(newPath));
+                                if (newPath == null && currentActiveVideo != null) {
+                                  context
+                                      .read<NoteEditorBloc>()
+                                      .add(RemoveVideo(currentActiveVideo));
+                                } else if (newPath != null) {
+                                  context
+                                      .read<NoteEditorBloc>()
+                                      .add(AddVideo(newPath));
+                                }
                               },
                               onInsertTimestamp: _insertTimestampAtCursor,
                             ),
                           ),
 
-                          // 2. Metadata Linkage Chips (Subject & Slot)
-                          if (hasLinkage && !isKeyboardOpen)
+                          // 1.1 Khay Media Video cuộn ngang (Horizontal Tray)
+                          if (hasVideo && !isKeyboardOpen)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: SizedBox(
+                                height: 60,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: videoList.length + 1,
+                                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                                  itemBuilder: (context, index) {
+                                    if (index == videoList.length) {
+                                      return OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        ),
+                                        icon: const Icon(Icons.add_circle_outline, size: 18),
+                                        label: const Text('Thêm clip'),
+                                        onPressed: _pickMoreVideo,
+                                      );
+                                    }
+                                    final path = videoList[index];
+                                    final isSelected = index == _selectedVideoIndex;
+                                    final fileName = path.split('/').last;
+
+                                    return Material(
+                                      color: isSelected
+                                          ? theme.colorScheme.primaryContainer
+                                          : theme.colorScheme.surfaceContainerLow,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        side: BorderSide(
+                                          color: isSelected
+                                              ? theme.colorScheme.primary
+                                              : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                          width: isSelected ? 1.5 : 1,
+                                        ),
+                                      ),
+                                      child: InkWell(
+                                        onTap: () {
+                                          setState(() => _selectedVideoIndex = index);
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          constraints: const BoxConstraints(maxWidth: 160),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isSelected
+                                                    ? Icons.play_circle_fill
+                                                    : Icons.play_circle_outline,
+                                                color: isSelected
+                                                    ? theme.colorScheme.primary
+                                                    : theme.colorScheme.onSurfaceVariant,
+                                                size: 22,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Column(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Clip #${index + 1}',
+                                                      style: theme.textTheme.labelMedium?.copyWith(
+                                                        fontWeight: isSelected
+                                                            ? FontWeight.bold
+                                                            : FontWeight.w600,
+                                                        color: isSelected
+                                                            ? theme.colorScheme.onPrimaryContainer
+                                                            : null,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      fileName,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: theme.textTheme.bodySmall?.copyWith(
+                                                        fontSize: 10,
+                                                        color: theme.colorScheme.outline,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.close, size: 16),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                tooltip: 'Xóa clip',
+                                                onPressed: () {
+                                                  context
+                                                      .read<NoteEditorBloc>()
+                                                      .add(RemoveVideo(path));
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                          // 2. Metadata Linkage Chips & Vị trí học tập
+                          if (!isKeyboardOpen)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8.0),
                               child: Wrap(
                                 spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   if (state.note.subjectId.isNotEmpty &&
                                       state.note.subjectId != 'general')
@@ -382,6 +611,36 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                                       label: Text(
                                         '${AppStrings.pinnedSlot}: ${state.note.slotId}',
                                       ),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  // Chip Vị trí học tập
+                                  if (state.note.location != null &&
+                                      state.note.location!.isNotEmpty)
+                                    InputChip(
+                                      avatar: const Icon(
+                                        Icons.place,
+                                        size: 16,
+                                        color: Colors.red,
+                                      ),
+                                      label: Text(state.note.location!),
+                                      onDeleted: () {
+                                        context
+                                            .read<NoteEditorBloc>()
+                                            .add(const UpdateLocation(null));
+                                      },
+                                      onPressed: () => _showLocationDialog(
+                                          context, state.note.location),
+                                      visualDensity: VisualDensity.compact,
+                                    )
+                                  else
+                                    ActionChip(
+                                      avatar: const Icon(
+                                        Icons.add_location_alt_outlined,
+                                        size: 16,
+                                      ),
+                                      label: const Text('📍 Vị trí'),
+                                      onPressed: () =>
+                                          _showLocationDialog(context, null),
                                       visualDensity: VisualDensity.compact,
                                     ),
                                 ],

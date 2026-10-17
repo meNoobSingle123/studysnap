@@ -42,7 +42,7 @@ void main() {
       });
     }
 
-    testWidgets('renders ToolsPage with biometric switch, map and settings items',
+    testWidgets('renders ToolsPage with biometric switch, documents and settings items',
         (tester) async {
       await setLargeScreen(tester);
       await tester.pumpWidget(buildTestableWidget());
@@ -52,7 +52,7 @@ void main() {
       expect(find.text(AppStrings.biometricLockTitle), findsOneWidget);
       expect(find.text(AppStrings.biometricLockSubtitle), findsOneWidget);
       expect(find.byType(SwitchListTile), findsOneWidget);
-      expect(find.text(AppStrings.mapNavigation), findsOneWidget);
+      expect(find.text(AppStrings.pdfExportTitle), findsOneWidget);
       expect(find.text(AppStrings.appSettings), findsOneWidget);
     });
 

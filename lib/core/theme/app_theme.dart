@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Application theme configurations supporting Material 3 Light & Dark modes.
 abstract final class AppTheme {
-  // Brand seed color
-  static const Color primarySeedColor = Color(0xFF1E56A0);
+  // Brand seed color (Google Blue)
+  static const Color primarySeedColor = Color(0xFF1A73E8);
 
   // Light Theme
   static ThemeData get lightTheme {
@@ -20,15 +20,25 @@ abstract final class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: true,
         elevation: 0,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: 0,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
-        elevation: 1,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+            width: 1,
+          ),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        elevation: 0,
+        backgroundColor: colorScheme.surface,
+        indicatorColor: colorScheme.primaryContainer.withValues(alpha: 0.7),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -72,15 +82,25 @@ abstract final class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: true,
         elevation: 0,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: 0,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
       ),
       cardTheme: CardThemeData(
-        elevation: 1,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+            width: 1,
+          ),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        elevation: 0,
+        backgroundColor: colorScheme.surface,
+        indicatorColor: colorScheme.primaryContainer.withValues(alpha: 0.7),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

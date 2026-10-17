@@ -3,10 +3,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Camera: image_picker (chụp ảnh OCR) & mobile_scanner -->
+    <!-- Camera: image_picker (Chụp ảnh bài giảng & OCR) -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Định vị GPS: geolocator (Bản đồ khuôn viên CĐ 9) -->
+    <!-- Định vị GPS: geolocator (Gắn vị trí phòng học & ghi chú) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 

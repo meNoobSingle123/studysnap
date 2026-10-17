@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
@@ -53,6 +54,15 @@ class _ToolsPageState extends State<ToolsPage> {
   }
 
   Future<void> _onToggleLock(bool value) async {
+    if (kIsWeb) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.mobileOnlyFeature)),
+        );
+      }
+      return;
+    }
+
     if (value) {
       try {
         final isSupported = await _localAuth.isDeviceSupported();
@@ -124,6 +134,25 @@ class _ToolsPageState extends State<ToolsPage> {
     );
   }
 
+  Widget _buildLeadingIcon(BuildContext context, IconData icon, {Color? color}) {
+    final theme = Theme.of(context);
+    final iconColor = color ?? theme.colorScheme.primary;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: iconColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        icon,
+        size: 20,
+        color: iconColor,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -136,53 +165,45 @@ class _ToolsPageState extends State<ToolsPage> {
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         children: [
           // NHÓM HỌC TẬP
-          _buildSectionHeader(context, 'HỌC TẬP'),
+          _buildSectionHeader(context, AppStrings.sectionStudy),
           ListTile(
-            leading: const Icon(Icons.picture_as_pdf_outlined),
+            leading: _buildLeadingIcon(context, Icons.picture_as_pdf_outlined),
             title: const Text(AppStrings.pdfExportTitle),
-            subtitle: const Text('Xuất Thời khóa biểu & Ghi chú A4'),
+            subtitle: const Text(AppStrings.pdfExportSubtitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(Routes.pdfExport),
           ),
-          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          Divider(indent: 72, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
           ListTile(
-            leading: const Icon(Icons.document_scanner_outlined),
+            leading: _buildLeadingIcon(context, Icons.document_scanner_outlined),
             title: const Text(AppStrings.ocrScanner),
-            subtitle: const Text('Chụp/chọn ảnh để nhận diện chữ in tự động'),
+            subtitle: const Text(AppStrings.ocrScannerSubtitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(Routes.ocrScanner),
           ),
-          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          Divider(indent: 72, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
           ListTile(
-            leading: const Icon(Icons.qr_code_scanner_outlined),
-            title: const Text(AppStrings.scannerTitle),
-            subtitle: const Text('Quét tài liệu và chụp ảnh bài giảng'),
+            leading: _buildLeadingIcon(context, Icons.camera_alt_outlined),
+            title: const Text('Chụp ảnh bài giảng'),
+            subtitle: const Text('Chụp ảnh tài liệu, bài giảng lưu vào ghi chú'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(Routes.scanner),
           ),
 
           // NHÓM HỆ THỐNG
-          _buildSectionHeader(context, 'HỆ THỐNG'),
+          _buildSectionHeader(context, AppStrings.sectionSystem),
           ListTile(
-            leading: const Icon(Icons.notifications_active_outlined),
+            leading: _buildLeadingIcon(context, Icons.notifications_active_outlined),
             title: const Text(AppStrings.notificationTitle),
-            subtitle: const Text('Lên lịch nhắc tự động trước ca học'),
+            subtitle: const Text(AppStrings.notificationSubtitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(Routes.notifications),
           ),
-          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          Divider(indent: 72, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
           ListTile(
-            leading: const Icon(Icons.map_outlined),
-            title: const Text(AppStrings.mapNavigation),
-            subtitle: const Text('Chỉ đường đi bộ đến tòa nhà trong khuôn viên'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(Routes.campusMap),
-          ),
-          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
-          ListTile(
-            leading: const Icon(Icons.settings_outlined),
+            leading: _buildLeadingIcon(context, Icons.settings_outlined),
             title: const Text(AppStrings.appSettings),
-            subtitle: const Text('Cấu hình ứng dụng và lưu trữ'),
+            subtitle: const Text(AppStrings.appSettingsSubtitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               // S13: System settings shortcut
@@ -190,9 +211,9 @@ class _ToolsPageState extends State<ToolsPage> {
           ),
 
           // NHÓM BẢO MẬT
-          _buildSectionHeader(context, 'BẢO MẬT'),
+          _buildSectionHeader(context, AppStrings.sectionSecurity),
           SwitchListTile(
-            secondary: const Icon(Icons.fingerprint),
+            secondary: _buildLeadingIcon(context, Icons.fingerprint),
             title: const Text(AppStrings.biometricLockTitle),
             subtitle: const Text(AppStrings.biometricLockSubtitle),
             value: _isLockEnabled,

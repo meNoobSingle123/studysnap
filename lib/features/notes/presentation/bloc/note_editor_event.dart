@@ -45,3 +45,48 @@ class AttachVideo extends NoteEditorEvent {
   List<Object?> get props => [videoPath];
 }
 
+/// Adds a video to the note's videoPaths list.
+class AddVideo extends NoteEditorEvent {
+  final String videoPath;
+  const AddVideo(this.videoPath);
+
+  @override
+  List<Object?> get props => [videoPath];
+}
+
+/// Removes a video from the note's videoPaths list.
+class RemoveVideo extends NoteEditorEvent {
+  final String videoPath;
+  const RemoveVideo(this.videoPath);
+
+  @override
+  List<Object?> get props => [videoPath];
+}
+
+/// Updates the study location.
+class UpdateLocation extends NoteEditorEvent {
+  final String? location;
+  const UpdateLocation(this.location);
+
+  @override
+  List<Object?> get props => [location];
+}
+
+/// Adds an image to the note's imagePaths list.
+class AddImage extends NoteEditorEvent {
+  final String imagePath;
+  const AddImage(this.imagePath);
+
+  @override
+  List<Object?> get props => [imagePath];
+}
+
+/// Removes an image from the note's imagePaths list.
+class RemoveImage extends NoteEditorEvent {
+  final String imagePath;
+  const RemoveImage(this.imagePath);
+
+  @override
+  List<Object?> get props => [imagePath];
+}
+

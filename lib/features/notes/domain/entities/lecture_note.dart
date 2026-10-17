@@ -8,22 +8,30 @@ class LectureNote extends Equatable {
   final String? slotId;
   final String title;
   final String bodyText;
-  final String? videoPath;
+  final List<String> videoPaths;
+  final List<String> imagePaths;
+  final String? location;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
 
-  const LectureNote({
+  LectureNote({
     required this.id,
     required this.subjectId,
     this.slotId,
     required this.title,
     required this.bodyText,
-    this.videoPath,
+    String? videoPath,
+    List<String>? videoPaths,
+    this.imagePaths = const [],
+    this.location,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
-  });
+  }) : videoPaths = videoPaths ?? (videoPath != null ? [videoPath] : const []);
+
+  /// Backward-compatibility getter for single video access.
+  String? get videoPath => videoPaths.isNotEmpty ? videoPaths.first : null;
 
   LectureNote copyWith({
     String? id,
@@ -32,18 +40,35 @@ class LectureNote extends Equatable {
     String? title,
     String? bodyText,
     String? videoPath,
+    List<String>? videoPaths,
     bool clearVideo = false,
+    List<String>? imagePaths,
+    String? location,
+    bool clearLocation = false,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
   }) {
+    List<String> resolvedVideos;
+    if (clearVideo) {
+      resolvedVideos = const [];
+    } else if (videoPaths != null) {
+      resolvedVideos = videoPaths;
+    } else if (videoPath != null) {
+      resolvedVideos = [videoPath];
+    } else {
+      resolvedVideos = this.videoPaths;
+    }
+
     return LectureNote(
       id: id ?? this.id,
       subjectId: subjectId ?? this.subjectId,
       slotId: slotId ?? this.slotId,
       title: title ?? this.title,
       bodyText: bodyText ?? this.bodyText,
-      videoPath: clearVideo ? null : (videoPath ?? this.videoPath),
+      videoPaths: resolvedVideos,
+      imagePaths: imagePaths ?? this.imagePaths,
+      location: clearLocation ? null : (location ?? this.location),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -57,7 +82,9 @@ class LectureNote extends Equatable {
         slotId,
         title,
         bodyText,
-        videoPath,
+        videoPaths,
+        imagePaths,
+        location,
         createdAt,
         updatedAt,
         deletedAt,

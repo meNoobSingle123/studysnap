@@ -110,23 +110,10 @@ abstract final class AppStrings {
   static const String ocrScanner = 'Nhận diện chữ từ ảnh (OCR)';
   static const String appSettings = 'Cài đặt hệ thống';
 
-  // Scanner & Camera Feature (S08, CĐ 10)
-  static const String scannerTitle = 'Camera & Quét mã QR';
-  static const String qrScannerTab = 'Quét mã QR';
-  static const String cameraCaptureTab = 'Chụp ảnh bài giảng';
-  static const String scanQrPrompt = 'Hướng camera về phía mã QR tài liệu';
-  static const String invalidQrCode =
-      'Mã QR không hợp lệ. Chỉ chấp nhận mã có định dạng studysnap://doc?url=https://...';
-  static const String insecureHttpBlocked =
-      'Liên kết bị từ chối vì không sử dụng giao thức HTTPS bảo mật.';
-  static const String qrDocumentConfirmTitle = 'Xác nhận mở tài liệu';
-  static const String qrDocumentConfirmMessage =
-      'Bạn có muốn mở tài liệu từ tên miền:';
-  static const String openInBrowser = 'Mở trình duyệt';
-  static const String needNetworkConnection = 'Cần kết nối mạng để mở tài liệu';
+  // Camera & Image Feature (S08, CĐ 10)
   static const String cameraPermissionRequired = 'Cần cấp quyền Camera';
   static const String cameraPermissionGuide =
-      'Ứng dụng cần quyền Camera để chụp ảnh bài giảng và quét mã QR tài liệu. Vui lòng cấp quyền trong Cài đặt hệ thống.';
+      'Ứng dụng cần quyền Camera để chụp ảnh bài giảng. Vui lòng cấp quyền trong Cài đặt hệ thống.';
   static const String openAppSettings = 'Mở Cài đặt';
   static const String capturedImages = 'Ảnh bài giảng đã chụp';
   static const String noImagesCaptured =
@@ -135,11 +122,10 @@ abstract final class AppStrings {
   static const String pickFromGallery = 'Chọn từ thư viện';
   static const String compressingImage = 'Đang tối ưu & nén ảnh...';
   static const String createNoteFromImage = 'Tạo ghi chú từ ảnh';
-  static const String testSampleQrCodes = 'Thử nghiệm mã QR mẫu';
-  static const String sampleValidQr1 = 'Mã hợp lệ (HCMUS Syllabus)';
-  static const String sampleValidQr2 = 'Mã hợp lệ (Google Drive)';
-  static const String sampleInvalidHttp = 'Mã không hợp lệ (HTTP không an toàn)';
-  static const String sampleInvalidScheme = 'Mã không hợp lệ (Sai Scheme)';
+  static const String invalidQrCode =
+      'Mã QR không hợp lệ. Chỉ chấp nhận mã có định dạng studysnap://doc?url=https://...';
+  static const String insecureHttpBlocked =
+      'Liên kết bị từ chối vì không sử dụng giao thức HTTPS bảo mật.';
 
   // Timetable Feature (S02, S03, S04)
   static const String timetableTitle = 'Thời khóa biểu';
@@ -208,5 +194,52 @@ abstract final class AppStrings {
   static const String errorUnknown = 'Đã có lỗi không xác định xảy ra. Vui lòng thử lại.';
   static const String pageNotFound = 'Không tìm thấy trang yêu cầu.';
   static const String errorPdfGeneration = 'Không thể tạo file PDF. Vui lòng thử lại.';
+
+  // Section Headers
+  static const String sectionStudy = 'HỌC TẬP';
+  static const String sectionSystem = 'HỆ THỐNG';
+  static const String sectionSecurity = 'BẢO MẬT';
+
+  // Tools Subtitles
+  static const String pdfExportSubtitle = 'Xuất Thời khóa biểu & Ghi chú A4';
+  static const String ocrScannerSubtitle = 'Chụp/chọn ảnh để nhận diện chữ in tự động';
+  static const String scannerSubtitle = 'Quét tài liệu và chụp ảnh bài giảng';
+  static const String notificationSubtitle = 'Lên lịch nhắc tự động trước ca học';
+  static const String mapNavigationSubtitle = 'Chỉ đường đi bộ đến tòa nhà trong khuôn viên';
+  static const String appSettingsSubtitle = 'Cấu hình ứng dụng và lưu trữ';
+
+  // Platform Safeguard
+  static const String mobileOnlyFeature = 'Tính năng này chỉ hỗ trợ trên thiết bị di động';
+
+  // Timetable
+  static const String noClassSelectedDate = 'Không có ca học nào trong ngày này';
+  static const String addSlot = 'Thêm ca học';
+  static const String addSlotTitle = 'Thêm ca học / Sự kiện';
+  static const String addSlotSubtitle = 'Lịch học hoặc sự kiện 1 lần / lặp tuần';
+  static const String eventTitleLabel = 'Tên môn học hoặc Sự kiện (Họp nhóm, Thi...) *';
+  static const String eventTitleHint = 'Tên môn học hoặc sự kiện (ví dụ: Họp nhóm, Thi...)';
+  static const String repeatWeekly = 'Lặp lại hàng tuần';
+  static const String repeatWeeklySubtitle = 'Tự động tạo lịch cho các tuần tiếp theo';
+  static const String invalidTimeRange = 'Giờ kết thúc phải sau giờ bắt đầu';
+
+  // OCR
+  static const String ocrTitle = 'Nhận diện chữ (OCR)';
+  static const String ocrGallery = 'Thư viện';
+  static const String ocrCopy = 'Sao chép';
+  static const String ocrCopied = 'Đã sao chép!';
+  static const String ocrInsertToNote = 'Chèn vào ghi chú';
+  static const String ocrNoTextFound = '(Không thấy chữ trong ảnh)';
+  static const String ocrErrorPrefix = 'Không nhận diện được: ';
+
+  // Location
+  static const String locationNotRetrieved = 'Chưa lấy vị trí';
+  static const String locating = 'Đang lấy vị trí...';
+  static const String locationPermissionError = 'Không lấy được vị trí (tắt dịch vụ hoặc từ chối quyền)';
+  static const String cannotOpenMaps = 'Không mở được Google Maps';
+  static const String tagClassroomLocation = 'Gắn vị trí phòng học';
+
+  // Notes
+  static const String videoLecture = 'Video bài giảng';
+  static const String cannotLoadNotes = 'Không thể tải ghi chú';
 }
 

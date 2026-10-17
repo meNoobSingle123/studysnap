@@ -206,6 +206,8 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -398,11 +400,16 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],

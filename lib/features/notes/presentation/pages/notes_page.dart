@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -429,7 +432,7 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          state.errorMessage ?? 'Không thể tải ghi chú',
+                          state.errorMessage ?? AppStrings.cannotLoadNotes,
                           style: theme.textTheme.bodyLarge,
                         ),
                       ],
@@ -574,29 +577,34 @@ class _NoteCard extends StatelessWidget {
 
     return Card(
       elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+          width: 1,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Badges Row
+              // Top Badges & Actions Row
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
-                      vertical: 4,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: subjectColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      color: subjectColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       subject?.name ?? note.subjectId,
@@ -610,19 +618,19 @@ class _NoteCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 7,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
+                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.schedule,
-                            size: 12,
+                            size: 11,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
@@ -637,8 +645,27 @@ class _NoteCard extends StatelessWidget {
                     ),
                   ],
                   const Spacer(),
+                  // Ngày tạo / cập nhật hiển thị xám nhạt góc phải
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: theme.colorScheme.outline,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        formattedDate,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20),
+                    icon: const Icon(Icons.delete_outline, size: 18),
                     color: theme.colorScheme.outline,
                     visualDensity: VisualDensity.compact,
                     tooltip: AppStrings.delete,
@@ -648,18 +675,18 @@ class _NoteCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
 
-              // Title
+              // Title in đậm vừa phải
               Text(
                 note.title.isNotEmpty ? note.title : AppStrings.untitledNote,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
 
-              // Body Snippet
+              // Body Snippet: tối đa 2 dòng không bị tràn chữ
               if (note.bodyText.isNotEmpty)
                 Text(
                   note.bodyText,
@@ -669,41 +696,97 @@ class _NoteCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              const SizedBox(height: 12),
 
-              // Footer: Date & Video status
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 14,
-                    color: theme.colorScheme.outline,
+              // Ảnh thumbnail thu nhỏ chuẩn Google Keep
+              if (note.imagePaths.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    height: 110,
+                    width: double.infinity,
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    child: kIsWeb
+                        ? Center(
+                            child: Icon(Icons.image, color: theme.colorScheme.outline),
+                          )
+                        : Image.file(
+                            File(note.imagePaths.first),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Center(
+                              child: Icon(Icons.broken_image_outlined,
+                                  color: theme.colorScheme.outline),
+                            ),
+                          ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    formattedDate,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                  if (note.videoPath != null) ...[
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.videocam_outlined,
-                      size: 16,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Video',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+                ),
+              ],
+
+              // Media & Location Badges
+              if (note.videoPaths.isNotEmpty ||
+                  (note.location != null && note.location!.isNotEmpty)) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (note.videoPaths.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.videocam_outlined,
+                              size: 14,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              note.videoPaths.length > 1
+                                  ? '${note.videoPaths.length} clips'
+                                  : AppStrings.videoLecture,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    if (note.location != null && note.location!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.place_outlined,
+                              size: 13,
+                              color: Colors.redAccent,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              note.location!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
-                ],
-              ),
+                ),
+              ],
             ],
           ),
         ),

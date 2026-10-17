@@ -31,9 +31,6 @@ abstract final class Routes {
   // Notifications Feature (Huy - CĐ 7)
   static const String notifications = '/settings/notifications';
 
-  // Campus Map Feature (Khiêm - CĐ 9)
-  static const String campusMap = '/maps/campus';
-
   // OCR Scanner Feature (Khiêm - CĐ 12)
   static const String ocrScanner = '/ocr/scanner';
 }
