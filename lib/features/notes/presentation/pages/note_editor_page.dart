@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nhom_7/features/notes/domain/utils/timestamp_helper.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
-import 'package:nhom_7/features/notes/domain/utils/timestamp_helper.dart';
+import '../../../ocr/ocr_scanner_page.dart';
 import '../bloc/note_editor_bloc.dart';
 import '../bloc/note_editor_event.dart';
 import '../bloc/note_editor_state.dart';
@@ -49,7 +50,6 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   final GlobalKey<LectureVideoPlayerState> _videoKey =
       GlobalKey<LectureVideoPlayerState>();
   bool _isInitialized = false;
-
   bool _isExiting = false;
   bool _canPop = false;
 
@@ -71,11 +71,15 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   }
 
   void _onBodyTextChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _saveIfUnsaved() {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final bloc = context.read<NoteEditorBloc>();
     if (bloc.state is NoteEditorLoaded) {
       final state = bloc.state as NoteEditorLoaded;
@@ -95,7 +99,9 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   }
 
   Future<void> _handleBackNavigation() async {
-    if (_isExiting) return;
+    if (_isExiting) {
+      return;
+    }
     _isExiting = true;
 
     try {
@@ -197,7 +203,9 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
         return PopScope(
           canPop: _canPop,
           onPopInvokedWithResult: (didPop, result) async {
-            if (didPop) return;
+            if (didPop) {
+              return;
+            }
             await _handleBackNavigation();
           },
           child: Scaffold(
@@ -226,6 +234,37 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                 ],
               ),
               actions: [
+                // Nút OCR: chèn chữ từ ảnh vào vị trí con trỏ (CĐ 12 / FR-14)
+                IconButton(
+                  tooltip: 'Nhận diện chữ từ ảnh (OCR)',
+                  icon: const Icon(Icons.document_scanner_outlined),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OcrScannerPage(
+                          onInsert: (text) {
+                            final ctrl = _bodyController;
+                            final old = ctrl.text;
+                            final sel = ctrl.selection;
+                            final pos = sel.isValid ? sel.start : old.length;
+                            final newText = old.substring(0, pos) +
+                                text +
+                                old.substring(pos);
+                            ctrl.value = TextEditingValue(
+                              text: newText,
+                              selection:
+                                  TextSelection.collapsed(offset: pos + text.length),
+                            );
+                            context
+                                .read<NoteEditorBloc>()
+                                .add(UpdateContent(bodyText: newText));
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 if (isSaving)
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
@@ -292,10 +331,7 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 1. Video Player — luôn tồn tại trong cây, AnimatedContainer
-                          //    co chiều cao mượt mà thay vì unmount/mount lại.
-                          //    Khi bàn phím mở: mini 68dp (góc phải).
-                          //    Khi bàn phím đóng: full height tự nhiên.
+                          // 1. Video Player
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeInOut,
@@ -353,8 +389,6 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                             ),
 
                           // 3. Note Title TextField
-                          //    ValueKey khóa cứng Element/State để Flutter
-                          //    không bao giờ unmount ô này khi viewport thay đổi.
                           Row(
                             children: [
                               Expanded(
@@ -444,7 +478,6 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                             ),
 
                           // 5. Note Body TextField
-                          //    ValueKey khóa cứng Element/State, tránh unmount.
                           TextField(
                             key: const ValueKey('note_content_field'),
                             controller: _bodyController,

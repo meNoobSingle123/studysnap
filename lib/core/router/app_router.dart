@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/export/domain/models/pdf_export_models.dart';
 import '../../features/export/presentation/pages/pdf_export_page.dart';
+import '../../features/maps/campus_map_page.dart';
 import '../../features/notes/presentation/pages/canvas_page.dart';
 import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
 import '../../features/notifications/presentation/pages/notification_settings_page.dart';
+import '../../features/ocr/ocr_scanner_page.dart';
 import '../../features/scanner/presentation/pages/scanner_camera_page.dart';
 import '../../features/security/presentation/pages/app_lock_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
@@ -15,6 +17,7 @@ import '../../features/timetable/presentation/pages/slot_detail_page.dart';
 
 import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../l10n/strings.dart';
+import '../security/auth_lock_listenable.dart';
 import 'routes.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -25,10 +28,20 @@ abstract final class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: Routes.timetable,
+    refreshListenable: AuthLockListenable.instance,
     redirect: (context, state) {
-      if (state.matchedLocation == Routes.home) {
+      final isLockLocation = state.matchedLocation == Routes.lock;
+      final isLockEnabled = AuthLockListenable.instance.isLockEnabled;
+      final isLocked = AuthLockListenable.instance.isLocked;
+
+      if (isLockEnabled && isLocked) {
+        return isLockLocation ? null : Routes.lock;
+      }
+
+      if (isLockLocation || state.matchedLocation == Routes.home) {
         return Routes.timetable;
       }
+
       return null;
     },
     routes: [
@@ -124,6 +137,16 @@ abstract final class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: Routes.notifications,
         builder: (context, state) => const NotificationSettingsPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.campusMap,
+        builder: (context, state) => const CampusMapPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.ocrScanner,
+        builder: (context, state) => const OcrScannerPage(),
       ),
     ],
 

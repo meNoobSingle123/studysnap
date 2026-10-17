@@ -1,70 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../../core/l10n/strings.dart';
+import 'package:nhom_7/core/l10n/strings.dart';
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/utils/stroke_math.dart';
 import 'active_stroke_painter.dart';
 import 'completed_strokes_painter.dart';
 
-/// Interaction mode for the canvas board.
+/// Interaction mode for [CanvasDrawingBoard].
 enum CanvasMode {
-  /// Pan & zoom mode — InteractiveViewer is active, drawing is locked.
+  /// InteractiveViewer handles pan & zoom gestures.
   view,
 
-  /// Draw mode — InteractiveViewer is locked, GestureDetector captures input.
+  /// Raw pointer gestures are captured to draw strokes.
   draw,
 }
 
-/// The main canvas widget that layers:
-/// 1. An optional background image.
-/// 2. A [RepaintBoundary]-isolated [CompletedStrokesPainter] layer.
-/// 3. A [RepaintBoundary]-isolated [ActiveStrokePainter] layer.
+/// Canvas drawing board with dual-layer rendering (completed strokes vs. active stroke)
+/// and dual interaction modes (View mode vs. Draw mode).
 ///
-/// Toggle between [CanvasMode.view] and [CanvasMode.draw] via the floating
-/// action button. In view mode the [InteractiveViewer] handles pan/zoom up to
-/// 5× (500%). In draw mode the viewer is locked and [GestureDetector] captures
-/// all pointer events.
+/// Implements requirements from:
+/// - CĐ 7 (Drawing Canvas)
+/// - rules/03-canvas-drawing.md
+/// - Architectural decision: RepaintBoundary isolation for 60fps drawing
 class CanvasDrawingBoard extends StatefulWidget {
-  /// Completed strokes to render on the lower paint layer.
+  /// All finalized strokes to be rendered on Layer 1.
   final List<Stroke> strokes;
 
-  /// Original image dimensions — used for coordinate normalization.
-  /// Pass [Size.zero] when no image is loaded yet.
+  /// Logical size of the canvas coordinate space (e.g. 1080×1920).
   final Size originalImageSize;
 
-  /// Optional background image widget (e.g. [Image.file]).
+  /// Optional background widget (e.g. captured camera image).
   final Widget? backgroundImage;
 
-  /// Called when the user finishes drawing a new stroke.
-  final void Function(Stroke stroke)? onStrokeAdded;
-
-  /// Called when undo is triggered.
-  final void Function()? onUndo;
-
-  /// Called when redo is triggered.
-  final void Function()? onRedo;
-
-  /// Active drawing tool.
+  /// Currently active drawing tool.
   final StrokeTool activeTool;
 
-  /// Active pen color.
+  /// Color used for new strokes.
   final Color activeColor;
 
-  /// Active pen width in logical pixels (scene space).
+  /// Width in scene pixels for new strokes.
   final double activeWidthScene;
+
+  /// Callback fired when a stroke is completed and normalized.
+  final ValueChanged<Stroke>? onStrokeAdded;
+
+  /// Callback fired when undo is tapped.
+  final VoidCallback? onUndo;
+
+  /// Callback fired when redo is tapped.
+  final VoidCallback? onRedo;
 
   const CanvasDrawingBoard({
     super.key,
     required this.strokes,
     required this.originalImageSize,
     this.backgroundImage,
-    this.onStrokeAdded,
-    this.onUndo,
-    this.onRedo,
     this.activeTool = StrokeTool.pen,
     this.activeColor = Colors.black,
     this.activeWidthScene = 4.0,
+    this.onStrokeAdded,
+    this.onUndo,
+    this.onRedo,
   });
 
   @override
@@ -100,19 +97,25 @@ class CanvasDrawingBoardState extends State<CanvasDrawingBoard> {
   // ---------------------------------------------------------------------------
 
   void _onPanStart(DragStartDetails details) {
-    if (_mode != CanvasMode.draw) return;
+    if (_mode != CanvasMode.draw) {
+      return;
+    }
     _activePoints.value = [];
     _scenePointsBuffer.clear();
     _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    if (_mode != CanvasMode.draw) return;
+    if (_mode != CanvasMode.draw) {
+      return;
+    }
     _addPoint(details.globalPosition, fallbackLocal: details.localPosition);
   }
 
   void _onPanEnd(DragEndDetails _) {
-    if (_mode != CanvasMode.draw) return;
+    if (_mode != CanvasMode.draw) {
+      return;
+    }
     _finalizeStroke();
   }
 

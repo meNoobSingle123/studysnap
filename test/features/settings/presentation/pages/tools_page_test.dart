@@ -33,8 +33,18 @@ void main() {
   }
 
   group('ToolsPage Widget Tests', () {
+    Future<void> setLargeScreen(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+    }
+
     testWidgets('renders ToolsPage with biometric switch, map and settings items',
         (tester) async {
+      await setLargeScreen(tester);
       await tester.pumpWidget(buildTestableWidget());
       await tester.pumpAndSettle();
 
@@ -48,6 +58,7 @@ void main() {
 
     testWidgets('toggling switch ON calls authenticate and sets lock enabled when successful',
         (tester) async {
+      await setLargeScreen(tester);
       when(() => mockLocalAuth.isDeviceSupported()).thenAnswer((_) async => true);
       when(() => mockLocalAuth.canCheckBiometrics).thenAnswer((_) async => true);
       when(() => mockLocalAuth.authenticate(
@@ -75,6 +86,7 @@ void main() {
 
     testWidgets('toggling switch OFF sets lock disabled without authentication prompt',
         (tester) async {
+      await setLargeScreen(tester);
       when(() => mockKeyStorage.isLockEnabled()).thenAnswer((_) async => true);
       AuthLockListenable.instance.setLockEnabled(true);
 

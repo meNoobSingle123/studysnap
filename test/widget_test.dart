@@ -19,12 +19,16 @@ void main() {
   });
 
   tearDown(() async {
+    AuthLockListenable.instance.setLockEnabled(false);
+    AuthLockListenable.instance.updateLockState(false);
     await getIt.reset();
   });
 
   testWidgets(
       'MyApp shows AppLockPage when locked and transitions to main tabs when unlocked',
       (WidgetTester tester) async {
+    AuthLockListenable.instance.setLockEnabled(true);
+    AuthLockListenable.instance.updateLockState(true);
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 

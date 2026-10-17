@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 
-import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../domain/entities/stroke.dart';
 import '../bloc/canvas_bloc.dart';
@@ -13,12 +13,12 @@ import '../utils/canvas_image_exporter.dart';
 import '../widgets/canvas/canvas_drawing_board.dart';
 import '../widgets/canvas/canvas_toolbar.dart';
 
-/// Fullscreen canvas page (S07) combining [CanvasDrawingBoard] with
-/// [CanvasToolbar] and raster export via [CanvasImageExporter].
+/// Màn hình vẽ và chú thích trên canvas S07 theo đặc tả CĐ 7 (mục 5.2, 5.3, 6.2).
+/// Hỗ trợ vẽ nét bút/highlight, tẩy xóa, undo/redo, xuất ảnh độ phân giải gốc.
 class CanvasPage extends StatelessWidget {
   final String? noteId;
   final Size originalImageSize;
-  final Widget? backgroundImage;
+  final Uint8List? backgroundImage;
   final Future<void> Function(List<Stroke> strokes, Uint8List? flatBytes)? onSave;
 
   const CanvasPage({
@@ -32,7 +32,13 @@ class CanvasPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => getIt<CanvasBloc>(),
+      create: (context) {
+        final getIt = GetIt.instance;
+        if (getIt.isRegistered<CanvasBloc>()) {
+          return getIt<CanvasBloc>();
+        }
+        return CanvasBloc();
+      },
       child: _CanvasPageView(
         noteId: noteId,
         originalImageSize: originalImageSize,
@@ -46,7 +52,7 @@ class CanvasPage extends StatelessWidget {
 class _CanvasPageView extends StatefulWidget {
   final String? noteId;
   final Size originalImageSize;
-  final Widget? backgroundImage;
+  final Uint8List? backgroundImage;
   final Future<void> Function(List<Stroke> strokes, Uint8List? flatBytes)? onSave;
 
   const _CanvasPageView({
@@ -92,7 +98,9 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
   }
 
   Future<bool> _confirmDiscard(CanvasState state) async {
-    if (!_hasUnsavedChanges) return true;
+    if (!_hasUnsavedChanges) {
+      return true;
+    }
 
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -130,7 +138,9 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
         return PopScope(
           canPop: !_hasUnsavedChanges,
           onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
+            if (didPop) {
+              return;
+            }
             final canLeave = await _confirmDiscard(state);
             if (canLeave && context.mounted) {
               Navigator.of(context).pop();
@@ -167,7 +177,10 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                   child: CanvasDrawingBoard(
                     strokes: state.strokes,
                     originalImageSize: widget.originalImageSize,
-                    backgroundImage: widget.backgroundImage,
+                    backgroundImage: widget.backgroundImage != null
+                        ? Image.memory(widget.backgroundImage!,
+                            fit: BoxFit.contain)
+                        : null,
                     activeTool: state.selectedTool,
                     activeColor: Color(state.selectedColor),
                     activeWidthScene: state.strokeWidth,

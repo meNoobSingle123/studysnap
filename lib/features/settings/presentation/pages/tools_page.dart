@@ -146,6 +146,14 @@ class _ToolsPageState extends State<ToolsPage> {
           ),
           Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
           ListTile(
+            leading: const Icon(Icons.document_scanner_outlined),
+            title: const Text(AppStrings.ocrScanner),
+            subtitle: const Text('Chụp/chọn ảnh để nhận diện chữ in tự động'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(Routes.ocrScanner),
+          ),
+          Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ListTile(
             leading: const Icon(Icons.qr_code_scanner_outlined),
             title: const Text(AppStrings.scannerTitle),
             subtitle: const Text('Quét tài liệu và chụp ảnh bài giảng'),
@@ -166,11 +174,9 @@ class _ToolsPageState extends State<ToolsPage> {
           ListTile(
             leading: const Icon(Icons.map_outlined),
             title: const Text(AppStrings.mapNavigation),
-            subtitle: const Text('Xem đường đi tới các tòa nhà trong trường'),
+            subtitle: const Text('Chỉ đường đi bộ đến tòa nhà trong khuôn viên'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // S10: Campus map navigation shortcut
-            },
+            onTap: () => context.push(Routes.campusMap),
           ),
           Divider(indent: 56, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
           ListTile(
