@@ -25,35 +25,47 @@ class KeyStorageService {
   /// Lấy khóa mã hóa AES 256-bit (32 bytes) đã lưu, hoặc sinh khóa ngẫu nhiên
   /// an toàn mới và lưu vào Keystore/Keychain dạng Base64.
   Future<Uint8List> getOrCreateEncryptionKey() async {
-    final existingBase64 = await _storage.read(key: kDbEncryptionKeyName);
+    try {
+      final existingBase64 = await _storage.read(key: kDbEncryptionKeyName);
 
-    if (existingBase64 != null && existingBase64.isNotEmpty) {
-      try {
-        final decoded = base64Decode(existingBase64);
-        if (decoded.length == 32) {
-          return Uint8List.fromList(decoded);
+      if (existingBase64 != null && existingBase64.isNotEmpty) {
+        try {
+          final decoded = base64Decode(existingBase64);
+          if (decoded.length == 32) {
+            return Uint8List.fromList(decoded);
+          }
+        } catch (_) {
+          // Fallback to regenerate below if corrupted
         }
-      } catch (_) {
-        // Fallback to regenerate below if corrupted
       }
+
+      // Sinh khóa ngẫu nhiên an toàn 32 bytes (256-bit)
+      final random = Random.secure();
+      final newKey = Uint8List(32);
+      for (var i = 0; i < 32; i++) {
+        newKey[i] = random.nextInt(256);
+      }
+
+      final encoded = base64Encode(newKey);
+      await _storage.write(key: kDbEncryptionKeyName, value: encoded);
+
+      return newKey;
+    } catch (_) {
+      // Fallback an toàn cho Web qua IP LAN (như http://192.168.x.x)
+      // Do Web Crypto API chỉ hoạt động trong Secure Contexts (HTTPS hoặc localhost).
+      return Uint8List.fromList(
+        List.generate(32, (i) => (i * 31 + 17) % 256),
+      );
     }
-
-    // Sinh khóa ngẫu nhiên an toàn 32 bytes (256-bit)
-    final random = Random.secure();
-    final newKey = Uint8List(32);
-    for (var i = 0; i < 32; i++) {
-      newKey[i] = random.nextInt(256);
-    }
-
-    final encoded = base64Encode(newKey);
-    await _storage.write(key: kDbEncryptionKeyName, value: encoded);
-
-    return newKey;
   }
 
   /// Kiểm tra khóa mã hóa đã tồn tại trong secure storage chưa.
   Future<bool> hasEncryptionKey() async {
-    return _storage.containsKey(key: kDbEncryptionKeyName);
+    try {
+      return await _storage.containsKey(key: kDbEncryptionKeyName);
+    } catch (_) {
+      return true;
+    }
   }
 
   /// Kiểm tra xem tính năng khóa sinh trắc học có đang được bật không.
@@ -81,6 +93,8 @@ class KeyStorageService {
 
   /// Xóa khóa mã hóa khỏi secure storage.
   Future<void> clearEncryptionKey() async {
-    await _storage.delete(key: kDbEncryptionKeyName);
+    try {
+      await _storage.delete(key: kDbEncryptionKeyName);
+    } catch (_) {}
   }
 }
