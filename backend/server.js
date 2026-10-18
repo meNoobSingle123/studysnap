@@ -231,6 +231,33 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Serve static Flutter Web build if available (non-API routes)
+  const webDir = path.join(__dirname, '..', 'build', 'web');
+  if (fs.existsSync(webDir) && req.method === 'GET' && !pathname.startsWith('/v1/')) {
+    let filePath = path.join(webDir, pathname === '/' ? 'index.html' : pathname);
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(webDir, 'index.html'); // SPA fallback for go_router
+    }
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes = {
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'application/javascript',
+        '.mjs': 'application/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.wasm': 'application/wasm',
+        '.ttf': 'font/ttf',
+        '.otf': 'font/otf'
+      };
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': contentType });
+      return fs.createReadStream(filePath).pipe(res);
+    }
+  }
+
   // 404 for unknown endpoints
   sendJson(res, 404, {
     error: 'Not Found',
