@@ -88,38 +88,40 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
     final encryptionKey = await keyStorageService.getOrCreateEncryptionKey();
     final cipher = HiveAesCipher(encryptionKey);
 
-    // 3. Mở các box với mã hóa HiveAesCipher (kiểm tra isBoxOpen nếu đã mở trước đó)
-    _subjectsBox = Hive.isBoxOpen(kSubjectsBox)
-        ? Hive.box<SubjectModel>(kSubjectsBox)
-        : await Hive.openBox<SubjectModel>(
-            kSubjectsBox,
-            encryptionCipher: cipher,
-          );
+    // Helper mở box an toàn, tự động khôi phục nếu box bị lệch khóa mã hóa / lỗi pad block
+    Future<Box<T>> openSafeBox<T>(String name) async {
+      try {
+        if (Hive.isBoxOpen(name)) {
+          final b = Hive.box<T>(name);
+          // Đọc length để kiểm tra tính toàn vẹn của mã hóa AES
+          b.length;
+          return b;
+        }
+        final b = await Hive.openBox<T>(name, encryptionCipher: cipher);
+        b.length;
+        return b;
+      } catch (_) {
+        try {
+          if (Hive.isBoxOpen(name)) {
+            await Hive.box(name).close();
+          }
+        } catch (_) {}
+        try {
+          await Hive.deleteBoxFromDisk(name);
+        } catch (_) {}
+        return await Hive.openBox<T>(name, encryptionCipher: cipher);
+      }
+    }
 
-    _slotsBox = Hive.isBoxOpen(kSlotsBox)
-        ? Hive.box<TimetableSlotModel>(kSlotsBox)
-        : await Hive.openBox<TimetableSlotModel>(
-            kSlotsBox,
-            encryptionCipher: cipher,
-          );
-
-    _examsBox = Hive.isBoxOpen(kExamsBox)
-        ? Hive.box<ExamScheduleModel>(kExamsBox)
-        : await Hive.openBox<ExamScheduleModel>(
-            kExamsBox,
-            encryptionCipher: cipher,
-          );
-
-    _buildingsBox = Hive.isBoxOpen(kBuildingsBox)
-        ? Hive.box<CampusBuildingModel>(kBuildingsBox)
-        : await Hive.openBox<CampusBuildingModel>(
-            kBuildingsBox,
-            encryptionCipher: cipher,
-          );
+    // 3. Mở các box với mã hóa HiveAesCipher
+    _subjectsBox = await openSafeBox<SubjectModel>(kSubjectsBox);
+    _slotsBox = await openSafeBox<TimetableSlotModel>(kSlotsBox);
+    _examsBox = await openSafeBox<ExamScheduleModel>(kExamsBox);
+    _buildingsBox = await openSafeBox<CampusBuildingModel>(kBuildingsBox);
 
     // 4. Tự động nạp dữ liệu mẫu ban đầu nếu CSDL trống
-    if (_subjectsBox!.isEmpty) {
-      await seedMockData();
+    if (_subjectsBox!.isEmpty || _slotsBox!.isEmpty) {
+      await seedMockData(force: true);
     }
   }
 

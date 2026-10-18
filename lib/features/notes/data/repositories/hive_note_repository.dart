@@ -25,12 +25,12 @@ class HiveNoteRepository implements NoteRepository {
   /// Khởi tạo và mở Box với khóa mã hóa an toàn nếu chưa mở.
   Future<Box<Map>> _getBox() async {
     if (box != null && box!.isOpen) {
-      return box!;
-    }
-
-    if (Hive.isBoxOpen(kNotesBoxName)) {
-      box = Hive.box<Map>(kNotesBoxName);
-      return box!;
+      try {
+        box!.length;
+        return box!;
+      } catch (_) {
+        box = null;
+      }
     }
 
     HiveCipher? cipher;
@@ -44,13 +44,30 @@ class HiveNoteRepository implements NoteRepository {
     }
 
     try {
+      if (Hive.isBoxOpen(kNotesBoxName)) {
+        final b = Hive.box<Map>(kNotesBoxName);
+        b.length;
+        box = b;
+        return box!;
+      }
       box = await Hive.openBox<Map>(
         kNotesBoxName,
         encryptionCipher: cipher,
       );
+      box!.length;
     } catch (_) {
-      // Nếu có lỗi do cipher cũ hoặc crash trước đó, mở không mã hóa để bảo đảm an toàn dữ liệu
-      box = await Hive.openBox<Map>(kNotesBoxName);
+      try {
+        if (Hive.isBoxOpen(kNotesBoxName)) {
+          await Hive.box(kNotesBoxName).close();
+        }
+      } catch (_) {}
+      try {
+        await Hive.deleteBoxFromDisk(kNotesBoxName);
+      } catch (_) {}
+      box = await Hive.openBox<Map>(
+        kNotesBoxName,
+        encryptionCipher: cipher,
+      );
     }
 
     return box!;
@@ -118,6 +135,15 @@ class HiveNoteRepository implements NoteRepository {
     );
   }
 
+  LectureNote? _safeFromMap(dynamic data) {
+    if (data is! Map) return null;
+    try {
+      return _fromMap(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _notify() async {
     if (!_streamController.isClosed) {
       final notes = await getAllNotes();
@@ -130,8 +156,8 @@ class HiveNoteRepository implements NoteRepository {
     final box = await _getBox();
     final data = box.get(id);
     if (data == null) return null;
-    final note = _fromMap(data);
-    if (note.deletedAt != null) return null;
+    final note = _safeFromMap(data);
+    if (note == null || note.deletedAt != null) return null;
     return note;
   }
 
@@ -145,11 +171,14 @@ class HiveNoteRepository implements NoteRepository {
   @override
   Future<List<LectureNote>> getAllNotes() async {
     final box = await _getBox();
-    final notes = box.values
-        .map((m) => _fromMap(m))
-        .where((n) => n.deletedAt == null)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final List<LectureNote> notes = [];
+    for (final v in box.values) {
+      final note = _safeFromMap(v);
+      if (note != null && note.deletedAt == null) {
+        notes.add(note);
+      }
+    }
+    notes.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return notes;
   }
 
@@ -166,10 +195,12 @@ class HiveNoteRepository implements NoteRepository {
     final box = await _getBox();
     final existingData = box.get(id);
     if (existingData != null) {
-      final existingNote = _fromMap(existingData);
-      final deleted = existingNote.copyWith(deletedAt: DateTime.now());
-      await box.put(id, _toMap(deleted));
-      await _notify();
+      final existingNote = _safeFromMap(existingData);
+      if (existingNote != null) {
+        final deleted = existingNote.copyWith(deletedAt: DateTime.now());
+        await box.put(id, _toMap(deleted));
+        await _notify();
+      }
     }
   }
 
