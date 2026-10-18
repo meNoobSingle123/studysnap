@@ -167,14 +167,6 @@ class _ToolsPageState extends State<ToolsPage> {
           // NHÓM HỌC TẬP
           _buildSectionHeader(context, AppStrings.sectionStudy),
           ListTile(
-            leading: _buildLeadingIcon(context, Icons.picture_as_pdf_outlined),
-            title: const Text(AppStrings.pdfExportTitle),
-            subtitle: const Text(AppStrings.pdfExportSubtitle),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(Routes.pdfExport),
-          ),
-          Divider(indent: 72, height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
-          ListTile(
             leading: _buildLeadingIcon(context, Icons.document_scanner_outlined),
             title: const Text(AppStrings.ocrScanner),
             subtitle: const Text(AppStrings.ocrScannerSubtitle),

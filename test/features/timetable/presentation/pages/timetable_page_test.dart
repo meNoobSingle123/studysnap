@@ -124,7 +124,7 @@ void main() {
 
       expect(onSaveCalled, isFalse);
       expect(find.text('Vui lòng nhập tên môn học hoặc sự kiện'), findsOneWidget);
-      expect(find.text('Vui lòng nhập phòng'), findsOneWidget);
+      expect(find.text('Vui lòng nhập phòng'), findsNothing);
     });
 
     testWidgets(

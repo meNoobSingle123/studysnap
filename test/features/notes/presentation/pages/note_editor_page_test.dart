@@ -186,5 +186,68 @@ void main() {
       expect(savedNote!.title, 'Tieu de moi');
       expect(savedNote.bodyText, 'Noi dung moi');
     });
+
+    testWidgets('renders action chips (Thêm ảnh, Vẽ tay) when note has no images',
+        (tester) async {
+      await tester.pumpWidget(buildTestHarness(noteId: 'test-note-actions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Thêm ảnh'), findsOneWidget);
+      expect(find.text('Vẽ tay'), findsOneWidget);
+      expect(find.text(AppStrings.canvasAttachmentTitle), findsNothing);
+      expect(find.byKey(const ValueKey('note_title_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('note_content_field')), findsOneWidget);
+    });
+
+    testWidgets('renders horizontal image tray and handles remove image when note has images',
+        (tester) async {
+      final noteWithImages = LectureNote(
+        id: 'test-note-images',
+        subjectId: 'CS101',
+        title: 'Ghi chú có ảnh',
+        bodyText: 'Nội dung',
+        imagePaths: ['test_image_1.png'],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await repository.saveNote(noteWithImages);
+
+      await tester.pumpWidget(buildTestHarness(noteId: 'test-note-images'));
+      await tester.pumpAndSettle();
+
+      // Action chips remain accessible
+      expect(find.text('Thêm ảnh'), findsWidgets);
+      expect(find.text('Vẽ tay'), findsOneWidget);
+
+      // Verify close icon for removing image is present
+      final closeFinder = find.byIcon(Icons.close);
+      expect(closeFinder, findsOneWidget);
+
+      // Tap close icon to remove image
+      await tester.tap(closeFinder);
+      await tester.pumpAndSettle();
+
+      // Image should be removed and action chips still present
+      expect(find.text('Vẽ tay'), findsOneWidget);
+    });
+
+    testWidgets('renders subject chip and does not show location chip',
+        (tester) async {
+      await tester.pumpWidget(buildTestHarness(noteId: 'test-note-subj-check'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chọn môn'), findsOneWidget);
+      expect(find.text('📍 Vị trí'), findsNothing);
+    });
+
+    testWidgets(
+        'renders video action chip and does not show bulky video card when note has no video',
+        (tester) async {
+      await tester.pumpWidget(buildTestHarness(noteId: 'test-note-no-video'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Thêm video'), findsOneWidget);
+      expect(find.text(AppStrings.videoAttach), findsNothing);
+    });
   });
 }

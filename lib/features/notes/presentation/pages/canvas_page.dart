@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/l10n/strings.dart';
 import '../../domain/entities/stroke.dart';
+import '../../domain/repositories/note_repository.dart';
 import '../bloc/canvas_bloc.dart';
 import '../bloc/canvas_event.dart';
 import '../bloc/canvas_state.dart';
@@ -69,14 +75,133 @@ class _CanvasPageView extends StatefulWidget {
 class _CanvasPageViewState extends State<_CanvasPageView> {
   bool _isSaving = false;
   bool _hasUnsavedChanges = false;
+  Uint8List? _backgroundImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _backgroundImage = widget.backgroundImage;
+  }
+
+  Future<ui.Image?> _loadUiImage(Uint8List? bytes) async {
+    if (bytes == null || bytes.isEmpty) return null;
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  }
+
+  Future<void> _pickBackgroundImage() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Chụp ảnh từ Camera'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _pickImageFromSource(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Chọn ảnh từ Thư viện'),
+              onTap: () {
+                Navigator.of(sheetCtx).pop();
+                _pickImageFromSource(ImageSource.gallery);
+              },
+            ),
+            if (_backgroundImage != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Xóa ảnh nền hiện tại',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  setState(() {
+                    _backgroundImage = null;
+                    _hasUnsavedChanges = true;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromSource(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        final bytes = await File(picked.path).readAsBytes();
+        if (mounted) {
+          setState(() {
+            _backgroundImage = bytes;
+            _hasUnsavedChanges = true;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể nạp ảnh: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _handleSave(CanvasState state) async {
     setState(() => _isSaving = true);
     try {
+      ui.Image? baseUiImage;
+      if (_backgroundImage != null) {
+        try {
+          baseUiImage = await _loadUiImage(_backgroundImage);
+        } catch (_) {}
+      }
+
       final bytes = await CanvasImageExporter.exportToBytes(
         strokes: state.strokes,
         targetSize: widget.originalImageSize,
+        baseImage: baseUiImage,
       );
+
+      String? savedPath;
+      if (bytes != null) {
+        try {
+          final docsDir = await getApplicationDocumentsDirectory();
+          final fileName = 'canvas_${const Uuid().v4()}.png';
+          final file = File('${docsDir.path}/$fileName');
+          await file.writeAsBytes(bytes, flush: true);
+          savedPath = file.path;
+
+          if (widget.noteId != null && GetIt.instance.isRegistered<NoteRepository>()) {
+            final noteRepo = GetIt.instance<NoteRepository>();
+            final note = await noteRepo.getNoteById(widget.noteId!);
+            if (note != null) {
+              final updatedImages = [...note.imagePaths, savedPath];
+              await noteRepo.saveNote(note.copyWith(
+                imagePaths: updatedImages,
+                updatedAt: DateTime.now(),
+              ));
+            }
+          }
+        } catch (_) {
+          // Fallback an toàn nếu có sự cố IO
+        }
+      }
 
       if (widget.onSave != null) {
         await widget.onSave!(state.strokes, bytes);
@@ -89,6 +214,7 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.canvasExportSuccess)),
         );
+        Navigator.of(context).pop(savedPath);
       }
     } finally {
       if (mounted) {
@@ -151,6 +277,11 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
               title: const Text(AppStrings.canvasPageTitle),
               leading: const BackButton(),
               actions: [
+                IconButton(
+                  tooltip: 'Thêm ảnh nền để vẽ',
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  onPressed: _pickBackgroundImage,
+                ),
                 if (_isSaving)
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
@@ -177,8 +308,8 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                   child: CanvasDrawingBoard(
                     strokes: state.strokes,
                     originalImageSize: widget.originalImageSize,
-                    backgroundImage: widget.backgroundImage != null
-                        ? Image.memory(widget.backgroundImage!,
+                    backgroundImage: _backgroundImage != null
+                        ? Image.memory(_backgroundImage!,
                             fit: BoxFit.contain)
                         : null,
                     activeTool: state.selectedTool,

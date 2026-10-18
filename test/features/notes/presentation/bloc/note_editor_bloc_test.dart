@@ -147,5 +147,21 @@ void main() {
         expect(saved!.title, equals('Tiêu đề cũ'));
       },
     );
+
+    blocTest<NoteEditorBloc, NoteEditorState>(
+      'updates subjectId and marks hasUnsavedChanges=true on UpdateSubject',
+      build: () => NoteEditorBloc(
+        getNoteByIdUseCase: getNoteByIdUseCase,
+        saveNoteUseCase: saveNoteUseCase,
+        autoSaveDuration: const Duration(seconds: 10),
+      ),
+      seed: () => NoteEditorLoaded(note: existingNote),
+      act: (bloc) => bloc.add(const UpdateSubject('NEW-SUBJECT')),
+      expect: () => [
+        isA<NoteEditorLoaded>()
+            .having((s) => s.note.subjectId, 'note.subjectId', 'NEW-SUBJECT')
+            .having((s) => s.hasUnsavedChanges, 'hasUnsavedChanges', true),
+      ],
+    );
   });
 }

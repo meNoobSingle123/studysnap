@@ -305,19 +305,7 @@ class LectureVideoPlayerState extends State<LectureVideoPlayer>
         widget.customController != null;
 
     if (!hasVideo) {
-      return Card(
-        elevation: 0,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: ListTile(
-          leading: const Icon(Icons.video_library_outlined),
-          title: const Text(AppStrings.videoAttach),
-          subtitle: const Text('Split-View & chèn mốc thời gian [mm:ss]'),
-          trailing: const Icon(Icons.add_circle_outline),
-          onTap: _pickVideo,
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     if (_hasError) {

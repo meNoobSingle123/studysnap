@@ -6,7 +6,7 @@ import 'package:nhom_7/features/notes/presentation/widgets/media/lecture_video_p
 
 void main() {
   group('LectureVideoPlayer Widget', () {
-    testWidgets('renders attachment card when videoPath is null and not in mini mode',
+    testWidgets('renders empty shrink widget when videoPath is null and not in mini mode',
         (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -19,8 +19,7 @@ void main() {
         ),
       );
 
-      expect(find.text(AppStrings.videoAttach), findsOneWidget);
-      expect(find.byIcon(Icons.video_library_outlined), findsOneWidget);
+      expect(find.text(AppStrings.videoAttach), findsNothing);
     });
 
     testWidgets('Mini-Player renders 120x68 dp container and play/pause button',

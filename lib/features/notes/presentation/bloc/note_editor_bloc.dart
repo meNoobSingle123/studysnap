@@ -28,6 +28,7 @@ class NoteEditorBloc extends Bloc<NoteEditorEvent, NoteEditorState> {
     on<UpdateLocation>(_onUpdateLocation);
     on<AddImage>(_onAddImage);
     on<RemoveImage>(_onRemoveImage);
+    on<UpdateSubject>(_onUpdateSubject);
     on<SaveNote>(_onSaveNote);
   }
 
@@ -176,6 +177,23 @@ class NoteEditorBloc extends Bloc<NoteEditorEvent, NoteEditorState> {
       final newImages = List<String>.from(current.note.imagePaths)..remove(event.imagePath);
       final updatedNote = current.note.copyWith(
         imagePaths: newImages,
+        updatedAt: DateTime.now(),
+      );
+      emit(current.copyWith(
+        note: updatedNote,
+        isSaveSuccess: false,
+        hasUnsavedChanges: true,
+      ));
+
+      _triggerDebouncedSave();
+    }
+  }
+
+  void _onUpdateSubject(UpdateSubject event, Emitter<NoteEditorState> emit) {
+    final current = state;
+    if (current is NoteEditorLoaded) {
+      final updatedNote = current.note.copyWith(
+        subjectId: event.subjectId,
         updatedAt: DateTime.now(),
       );
       emit(current.copyWith(
