@@ -15,7 +15,12 @@ class KeyStorageService {
   final FlutterSecureStorage _storage;
 
   KeyStorageService({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(
+                resetOnError: true,
+              ),
+            );
 
   /// Lấy khóa mã hóa AES 256-bit (32 bytes) đã lưu, hoặc sinh khóa ngẫu nhiên
   /// an toàn mới và lưu vào Keystore/Keychain dạng Base64.

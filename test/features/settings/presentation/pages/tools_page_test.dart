@@ -52,7 +52,7 @@ void main() {
       expect(find.text(AppStrings.biometricLockTitle), findsOneWidget);
       expect(find.text(AppStrings.biometricLockSubtitle), findsOneWidget);
       expect(find.byType(SwitchListTile), findsOneWidget);
-      expect(find.text(AppStrings.pdfExportTitle), findsOneWidget);
+      expect(find.text(AppStrings.ocrScanner), findsOneWidget);
       expect(find.text(AppStrings.appSettings), findsOneWidget);
     });
 

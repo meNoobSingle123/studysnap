@@ -7,7 +7,7 @@ import 'package:local_auth/local_auth.dart';
 
 import '../../features/export/domain/services/pdf_generator_service.dart';
 import '../../features/export/presentation/bloc/pdf_export_bloc.dart';
-import '../../features/notes/data/repositories/in_memory_note_repository.dart';
+import '../../features/notes/data/repositories/hive_note_repository.dart';
 import '../../features/notes/domain/repositories/note_repository.dart';
 import '../../features/notes/domain/usecases/delete_note_usecase.dart';
 import '../../features/notes/domain/usecases/get_all_notes_usecase.dart';
@@ -52,7 +52,11 @@ Future<void> configureDependencies({bool isTest = false}) async {
 
   // Core security & storage
   getIt.registerLazySingleton<FlutterSecureStorage>(
-    () => const FlutterSecureStorage(),
+    () => const FlutterSecureStorage(
+      aOptions: AndroidOptions(
+        resetOnError: true,
+      ),
+    ),
   );
   getIt.registerLazySingleton<KeyStorageService>(
     () => KeyStorageService(storage: getIt<FlutterSecureStorage>()),
@@ -72,8 +76,14 @@ Future<void> configureDependencies({bool isTest = false}) async {
   );
 
   // Timetable Module (Hive CE Local DataSource & Repositories)
+  final timetableLocalDataSource = TimetableLocalDataSourceImpl(
+    keyStorageService: getIt<KeyStorageService>(),
+  );
+  try {
+    await timetableLocalDataSource.init();
+  } catch (_) {}
   getIt.registerLazySingleton<TimetableLocalDataSource>(
-    () => TimetableLocalDataSourceImpl(keyStorageService: getIt<KeyStorageService>()),
+    () => timetableLocalDataSource,
   );
   getIt.registerLazySingleton<TimetableRepository>(
     () => TimetableRepositoryImpl(
@@ -94,9 +104,14 @@ Future<void> configureDependencies({bool isTest = false}) async {
     () => const CalculateGpaUseCase(),
   );
 
-  // Notes Module (InMemory for independent testing)
+  // Notes Module (Local-First persistence via Hive CE)
+  final hiveNoteRepo = HiveNoteRepository(
+    keyStorageService: getIt<KeyStorageService>(),
+  );
+  await hiveNoteRepo.init();
+
   getIt.registerLazySingleton<NoteRepository>(
-    () => InMemoryNoteRepository(seedMockData: !isTest),
+    () => hiveNoteRepo,
   );
   getIt.registerLazySingleton<GetNoteByIdUseCase>(
     () => GetNoteByIdUseCase(getIt<NoteRepository>()),

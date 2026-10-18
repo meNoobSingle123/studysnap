@@ -85,8 +85,13 @@ abstract final class AppRouter {
         path: Routes.noteEditor,
         builder: (context, state) {
           final noteId = state.pathParameters['id'] ?? '';
-          final subjectId = state.uri.queryParameters['subjectId'];
-          final slotId = state.uri.queryParameters['slotId'];
+          final extraMap = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          final subjectId = extraMap?['subjectId'] as String? ??
+              state.uri.queryParameters['subjectId'];
+          final slotId = extraMap?['slotId'] as String? ??
+              state.uri.queryParameters['slotId'];
           return NoteEditorPage(
             noteId: noteId,
             subjectId: subjectId,

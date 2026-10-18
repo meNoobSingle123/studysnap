@@ -41,6 +41,33 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
 
   TimetableLocalDataSourceImpl({required this.keyStorageService});
 
+  Completer<void>? _initCompleter;
+
+  Future<void> _ensureInitialized() async {
+    if (_subjectsBox != null &&
+        _subjectsBox!.isOpen &&
+        _slotsBox != null &&
+        _slotsBox!.isOpen &&
+        _examsBox != null &&
+        _examsBox!.isOpen &&
+        _buildingsBox != null &&
+        _buildingsBox!.isOpen) {
+      return;
+    }
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+    _initCompleter = Completer<void>();
+    try {
+      await init();
+      _initCompleter!.complete();
+    } catch (e, st) {
+      _initCompleter!.completeError(e, st);
+      _initCompleter = null;
+      rethrow;
+    }
+  }
+
   @override
   Future<void> init() async {
     // 1. Đăng ký TypeAdapters nếu chưa đăng ký
@@ -61,23 +88,34 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
     final encryptionKey = await keyStorageService.getOrCreateEncryptionKey();
     final cipher = HiveAesCipher(encryptionKey);
 
-    // 3. Mở các box với mã hóa HiveAesCipher
-    _subjectsBox = await Hive.openBox<SubjectModel>(
-      kSubjectsBox,
-      encryptionCipher: cipher,
-    );
-    _slotsBox = await Hive.openBox<TimetableSlotModel>(
-      kSlotsBox,
-      encryptionCipher: cipher,
-    );
-    _examsBox = await Hive.openBox<ExamScheduleModel>(
-      kExamsBox,
-      encryptionCipher: cipher,
-    );
-    _buildingsBox = await Hive.openBox<CampusBuildingModel>(
-      kBuildingsBox,
-      encryptionCipher: cipher,
-    );
+    // 3. Mở các box với mã hóa HiveAesCipher (kiểm tra isBoxOpen nếu đã mở trước đó)
+    _subjectsBox = Hive.isBoxOpen(kSubjectsBox)
+        ? Hive.box<SubjectModel>(kSubjectsBox)
+        : await Hive.openBox<SubjectModel>(
+            kSubjectsBox,
+            encryptionCipher: cipher,
+          );
+
+    _slotsBox = Hive.isBoxOpen(kSlotsBox)
+        ? Hive.box<TimetableSlotModel>(kSlotsBox)
+        : await Hive.openBox<TimetableSlotModel>(
+            kSlotsBox,
+            encryptionCipher: cipher,
+          );
+
+    _examsBox = Hive.isBoxOpen(kExamsBox)
+        ? Hive.box<ExamScheduleModel>(kExamsBox)
+        : await Hive.openBox<ExamScheduleModel>(
+            kExamsBox,
+            encryptionCipher: cipher,
+          );
+
+    _buildingsBox = Hive.isBoxOpen(kBuildingsBox)
+        ? Hive.box<CampusBuildingModel>(kBuildingsBox)
+        : await Hive.openBox<CampusBuildingModel>(
+            kBuildingsBox,
+            encryptionCipher: cipher,
+          );
 
     // 4. Tự động nạp dữ liệu mẫu ban đầu nếu CSDL trống
     if (_subjectsBox!.isEmpty) {
@@ -87,6 +125,9 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
 
   @override
   Future<void> seedMockData({bool force = false}) async {
+    if (_subjectsBox == null || !_subjectsBox!.isOpen) {
+      await _ensureInitialized();
+    }
     if (force || _sBox.isEmpty) {
       final subjectEntries = {
         for (final s in TimetableMockData.subjects) s.id: s
@@ -107,6 +148,10 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
         for (final e in TimetableMockData.exams) e.id: e
       };
       await _eBox.putAll(eEntries);
+      await _sBox.flush();
+      await _slBox.flush();
+      await _bBox.flush();
+      await _eBox.flush();
     }
   }
 
@@ -138,42 +183,34 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
 
   @override
   Stream<List<TimetableSlotModel>> watchSlotsByDay(int dayOfWeek) async* {
-    if (_slotsBox == null) {
-      yield [];
-      return;
-    }
+    await _ensureInitialized();
     yield _filterSlotsByDay(dayOfWeek);
     yield* _slBox.watch().map((_) => _filterSlotsByDay(dayOfWeek));
   }
 
   @override
   Stream<List<TimetableSlotModel>> watchAllSlots() async* {
-    if (_slotsBox == null) {
-      yield [];
-      return;
-    }
+    await _ensureInitialized();
     yield _filterAllActiveSlots();
     yield* _slBox.watch().map((_) => _filterAllActiveSlots());
   }
 
   @override
   Stream<List<SubjectModel>> watchSubjects() async* {
-    if (_subjectsBox == null) {
-      yield [];
-      return;
-    }
+    await _ensureInitialized();
     yield _filterActiveSubjects();
     yield* _sBox.watch().map((_) => _filterActiveSubjects());
   }
 
   @override
   Future<List<SubjectModel>> getSubjects() async {
-    if (_subjectsBox == null) return [];
+    await _ensureInitialized();
     return _filterActiveSubjects();
   }
 
   @override
   Future<SubjectModel?> getSubjectById(String id) async {
+    await _ensureInitialized();
     try {
       final s = _sBox.get(id);
       if (s != null && !s.isDeleted) return s;
@@ -185,26 +222,33 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
 
   @override
   Future<void> saveSubject(SubjectModel subject) async {
+    await _ensureInitialized();
     await _sBox.put(subject.id, subject);
+    await _sBox.flush();
   }
 
   @override
   Future<void> softDeleteSubject(String id) async {
+    await _ensureInitialized();
     final s = _sBox.get(id);
     if (s != null) {
       final deleted = s.copyWith(deletedAt: DateTime.now());
       await _sBox.put(id, SubjectModel.fromEntity(deleted));
+      await _sBox.flush();
     }
   }
 
   @override
   Future<void> saveSlots(List<TimetableSlotModel> slots) async {
+    await _ensureInitialized();
     final entries = {for (final slot in slots) slot.id: slot};
     await _slBox.putAll(entries);
+    await _slBox.flush();
   }
 
   @override
   Future<TimetableSlotModel?> getSlotById(String id) async {
+    await _ensureInitialized();
     try {
       final slot = _slBox.get(id);
       if (slot != null && !slot.isDeleted) return slot;
@@ -216,32 +260,38 @@ class TimetableLocalDataSourceImpl implements TimetableLocalDataSource {
 
   @override
   Future<void> deleteSlot(String id) async {
+    await _ensureInitialized();
     final slot = _slBox.get(id);
     if (slot != null) {
       final deleted = slot.copyWith(deletedAt: DateTime.now());
       await _slBox.put(id, TimetableSlotModel.fromEntity(deleted));
+      await _slBox.flush();
     }
   }
 
   @override
   Future<List<ExamScheduleModel>> getExams() async {
+    await _ensureInitialized();
     return _eBox.values.toList()
       ..sort((a, b) => a.date.compareTo(b.date));
   }
 
   @override
   Future<void> saveExams(List<ExamScheduleModel> exams) async {
+    await _ensureInitialized();
     final entries = {for (final exam in exams) exam.id: exam};
     await _eBox.putAll(entries);
   }
 
   @override
   Future<List<CampusBuildingModel>> getBuildings() async {
+    await _ensureInitialized();
     return _bBox.values.toList();
   }
 
   @override
   Future<void> saveBuildings(List<CampusBuildingModel> buildings) async {
+    await _ensureInitialized();
     final entries = {for (final b in buildings) b.id: b};
     await _bBox.putAll(entries);
   }

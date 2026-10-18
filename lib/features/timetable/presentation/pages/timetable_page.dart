@@ -7,9 +7,9 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../../core/errors/app_exception.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../data/datasources/timetable_local_datasource.dart';
 import '../../data/datasources/timetable_remote_data_source.dart';
 import '../../domain/entities/subject.dart';
 import '../../domain/entities/timetable_slot.dart';
@@ -56,39 +56,81 @@ class _TimetablePageState extends State<TimetablePage> {
         _isSyncing = false;
       });
 
+      // Nếu có subjects/slots trả về từ server, cập nhật vào local DB
+      if (getIt.isRegistered<TimetableRepository>()) {
+        final repo = getIt<TimetableRepository>();
+        final subjectsRaw = data['subjects'] as List<dynamic>? ?? [];
+        final slotsRaw = data['slots'] as List<dynamic>? ?? [];
+
+        for (final item in subjectsRaw) {
+          final m = item as Map<String, dynamic>;
+          final subj = Subject(
+            id: m['id'] as String,
+            name: m['name'] as String,
+            code: m['code'] as String? ?? '',
+            credits: m['credits'] as int? ?? 3,
+            colorArgb: m['colorArgb'] as int? ?? 0xFF1976D2,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          await repo.saveSubject(subj);
+        }
+
+        final slots = slotsRaw.map((e) {
+          final m = e as Map<String, dynamic>;
+          return TimetableSlot(
+            id: m['id'] as String,
+            subjectId: m['subjectId'] as String,
+            room: m['room'] as String? ?? '',
+            buildingId: m['buildingId'] as String?,
+            dayOfWeek: m['dayOfWeek'] as int? ?? 1,
+            startMin: m['startMin'] as int? ?? 420,
+            endMin: m['endMin'] as int? ?? 540,
+            termStart: DateTime.tryParse(m['termStart'] as String? ?? '') ??
+                DateTime.now(),
+            termEnd: DateTime.tryParse(m['termEnd'] as String? ?? '') ??
+                DateTime.now(),
+            source: 'system',
+            updatedAt: DateTime.now(),
+          );
+        }).toList();
+
+        if (slots.isNotEmpty) {
+          await repo.saveSlots(slots);
+        }
+      }
+
+      if (blocContext != null && blocContext.mounted) {
+        blocContext.read<TimetableBloc>().add(DaySelectedEvent(DateTime.now()));
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppStrings.syncTimetableSuccess),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSyncing = false;
+      });
+
+      // Vẫn reload dữ liệu từ database cục bộ để UI luôn được làm mới
       if (blocContext != null && blocContext.mounted) {
         blocContext.read<TimetableBloc>().add(DaySelectedEvent(DateTime.now()));
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(AppStrings.syncTimetableSuccess),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } on AppException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isSyncing = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isSyncing = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.syncTimetableFailed),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
+          content: Text(
+            'Ứng dụng đang chạy Ngoại tuyến (Local-First). Không kết nối được tới máy chủ trường học (Port 3000). Đã làm mới dữ liệu từ máy.',
+          ),
+          backgroundColor: Colors.blueGrey,
+          duration: Duration(seconds: 4),
         ),
       );
     }
@@ -233,6 +275,137 @@ class _TimetableViewState extends State<_TimetableView> {
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
 
+  Future<void> _pickYearMonth(BuildContext context, DateTime current) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2035, 12, 31),
+      initialDatePickerMode: DatePickerMode.year,
+      locale: const Locale('vi', 'VN'),
+      helpText: 'Chọn Tháng & Năm',
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+      fieldLabelText: 'Nhập ngày',
+      fieldHintText: 'dd/mm/yyyy',
+      errorFormatText: 'Định dạng ngày không hợp lệ (ngày/tháng/năm)',
+      errorInvalidText: 'Ngày không hợp lệ',
+    );
+    if (picked != null) {
+      setState(() {
+        _focusedDay = picked;
+      });
+      if (context.mounted) {
+        context.read<TimetableBloc>().add(DaySelectedEvent(picked));
+      }
+    }
+  }
+
+  Future<void> _clearSystemSlots(BuildContext blocContext) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final repo = getIt<TimetableRepository>();
+      final slots = await repo.watchAllSlots().first;
+      final systemSlots = slots.where((s) => s.isSystem).toList();
+      for (final s in systemSlots) {
+        await repo.deleteSlot(s.id);
+      }
+      if (!mounted) return;
+      if (blocContext.mounted) {
+        blocContext.read<TimetableBloc>().add(DaySelectedEvent(_focusedDay));
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã xóa ${systemSlots.length} ca học mẫu. Lịch hiện chỉ hiển thị ca học do bạn tự tạo!',
+          ),
+          backgroundColor: Colors.blueAccent,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Lỗi khi xóa ca học mẫu: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _restoreMockData(BuildContext blocContext) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (getIt.isRegistered<TimetableLocalDataSource>()) {
+        await getIt<TimetableLocalDataSource>().seedMockData(force: true);
+      }
+      if (!mounted) return;
+      if (blocContext.mounted) {
+        blocContext.read<TimetableBloc>().add(DaySelectedEvent(_focusedDay));
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Đã khôi phục dữ liệu ca học mẫu hệ thống.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Lỗi khi khôi phục dữ liệu: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearAllSlots(BuildContext blocContext) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa toàn bộ'),
+        content: const Text(
+          'Hành động này sẽ xóa tất cả ca học hiện có trên thời khóa biểu. Bạn có chắc chắn không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa hết'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final repo = getIt<TimetableRepository>();
+        final slots = await repo.watchAllSlots().first;
+        for (final s in slots) {
+          await repo.deleteSlot(s.id);
+        }
+        if (!mounted) return;
+        if (blocContext.mounted) {
+          blocContext.read<TimetableBloc>().add(DaySelectedEvent(_focusedDay));
+        }
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa toàn bộ ca học khỏi thời khóa biểu.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      } catch (e) {
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(content: Text('Lỗi khi xóa thời khóa biểu: $e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -241,17 +414,22 @@ class _TimetableViewState extends State<_TimetableView> {
       appBar: AppBar(
         title: const Text(AppStrings.timetableTitle),
         actions: [
-          // Nút đồng bộ với server
+          // Nút Làm mới cục bộ (Local-First, không gọi mạng)
           IconButton(
-            tooltip: AppStrings.syncTimetable,
-            icon: widget.isSyncing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            onPressed: widget.isSyncing ? null : widget.onSync,
+            tooltip: 'Làm mới lịch',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () {
+              context
+                  .read<TimetableBloc>()
+                  .add(DaySelectedEvent(_focusedDay));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã làm mới dữ liệu thời khóa biểu.'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
           ),
           // Nút xuất PDF Thời khóa biểu (S09)
           IconButton(
@@ -264,6 +442,70 @@ class _TimetableViewState extends State<_TimetableView> {
             tooltip: AppStrings.gpaProjectionTitle,
             icon: const Icon(Icons.calculate_outlined),
             onPressed: () => context.push(Routes.gpaProjection),
+          ),
+          // Menu Tùy chọn dữ liệu thời khóa biểu (Dọn dẹp ca học mẫu & Đồng bộ từ xa)
+          PopupMenuButton<String>(
+            tooltip: 'Tùy chọn dữ liệu',
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (value) async {
+              if (value == 'sync_api') {
+                widget.onSync();
+              } else if (value == 'clear_mock') {
+                await _clearSystemSlots(context);
+              } else if (value == 'restore_mock') {
+                await _restoreMockData(context);
+              } else if (value == 'clear_all') {
+                await _clearAllSlots(context);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'sync_api',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_sync_outlined,
+                        size: 20, color: Colors.blueAccent),
+                    SizedBox(width: 10),
+                    Text('Đồng bộ máy chủ trường (API)'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'clear_mock',
+                child: Row(
+                  children: [
+                    Icon(Icons.cleaning_services_outlined,
+                        size: 20, color: Colors.blue),
+                    SizedBox(width: 10),
+                    Text('Xóa ca mẫu (Chỉ giữ ca tự tạo)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'restore_mock',
+                child: Row(
+                  children: [
+                    Icon(Icons.restore_page_outlined,
+                        size: 20, color: Colors.green),
+                    SizedBox(width: 10),
+                    Text('Khôi phục ca mẫu hệ thống'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'clear_all',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_sweep_outlined,
+                        size: 20, color: Colors.red),
+                    SizedBox(width: 10),
+                    Text('Xóa toàn bộ thời khóa biểu'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -281,11 +523,10 @@ class _TimetableViewState extends State<_TimetableView> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              widget.onSync();
               context
                   .read<TimetableBloc>()
                   .add(DaySelectedEvent(loaded.selectedDay));
-              await Future.delayed(const Duration(milliseconds: 600));
+              await Future.delayed(const Duration(milliseconds: 300));
             },
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -328,11 +569,39 @@ class _TimetableViewState extends State<_TimetableView> {
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: TableCalendar<TimetableSlot>(
-                      firstDay: DateTime(2026, 1, 1),
-                      lastDay: DateTime(2027, 12, 31),
+                      locale: 'vi_VN',
+                      firstDay: DateTime(2020, 1, 1),
+                      lastDay: DateTime(2035, 12, 31),
                       focusedDay: _focusedDay,
                       calendarFormat: _calendarFormat,
                       startingDayOfWeek: StartingDayOfWeek.monday,
+                      calendarBuilders: CalendarBuilders(
+                        dowBuilder: (context, day) {
+                          const weekdays = [
+                            'T2',
+                            'T3',
+                            'T4',
+                            'T5',
+                            'T6',
+                            'T7',
+                            'CN'
+                          ];
+                          final text = weekdays[day.weekday - 1];
+                          final isSunday = day.weekday == DateTime.sunday;
+                          return Center(
+                            child: Text(
+                              text,
+                              style: TextStyle(
+                                color: isSunday
+                                    ? Colors.redAccent
+                                    : theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       selectedDayPredicate: (day) =>
                           isSameDay(loaded.selectedDay, day),
                       onDaySelected: (selectedDay, focusedDay) {
@@ -367,17 +636,21 @@ class _TimetableViewState extends State<_TimetableView> {
                         ),
                         selectedDecoration: BoxDecoration(
                           color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
+                            shape: BoxShape.circle,
                         ),
                         markerDecoration: BoxDecoration(
                           color: theme.colorScheme.secondary,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      headerStyle: const HeaderStyle(
-                        formatButtonVisible: true,
+                      onHeaderTapped: (focusedDay) {
+                        _pickYearMonth(context, focusedDay);
+                      },
+                      headerStyle: HeaderStyle(
+                        formatButtonVisible: false,
                         titleCentered: true,
-                        formatButtonShowsNext: false,
+                        titleTextFormatter: (date, locale) =>
+                            'Tháng ${date.month} năm ${date.year}',
                       ),
                     ),
                   ),
@@ -439,6 +712,20 @@ class _TimetableViewState extends State<_TimetableView> {
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          if (loaded.allSlots.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Text(
+                                'Bạn có ${loaded.allSlots.length} ca học trong tuần. Hãy chạm vào ngày có chấm tròn trên lịch để xem.',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -587,49 +874,61 @@ class _TimetableViewState extends State<_TimetableView> {
     bool isReminderActive,
   ) {
     final theme = Theme.of(context);
-    final subjectColor = subject != null ? Color(subject.colorArgb) : theme.colorScheme.primary;
+    final subjectColor =
+        subject != null ? Color(subject.colorArgb) : theme.colorScheme.primary;
+
+    final durationMin = slot.endMin - slot.startMin;
+    final durHours = durationMin ~/ 60;
+    final durMins = durationMin % 60;
+    final durationText = durHours > 0
+        ? (durMins > 0 ? '$durHours h $durMins p' : '$durHours tiếng')
+        : '$durMins phút';
+
+    final roomDisplay =
+        slot.room.trim().isEmpty ? 'Chưa xếp phòng' : 'Phòng ${slot.room}';
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
           width: 1,
         ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => context.push(Routes.slotDetailRoute(slot.id)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+          padding: const EdgeInsets.all(14.0),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Dải màu nhỏ mép trái phân biệt môn học
+              // 1. Dải màu nổi bật cạnh trái
               Container(
-                width: 4,
-                height: 48,
+                width: 5,
+                height: 56,
                 decoration: BoxDecoration(
                   color: subjectColor,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
               const SizedBox(width: 12),
 
-              // Thông tin giờ học hiển thị dạng cột gọn gàng
+              // 2. Khung giờ học to, trực quan
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(8),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       slot.startTimeFormatted,
-                      style: theme.textTheme.labelMedium?.copyWith(
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,
                       ),
@@ -639,6 +938,16 @@ class _TimetableViewState extends State<_TimetableView> {
                       slot.endTimeFormatted,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      durationText,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
                   ],
@@ -646,17 +955,18 @@ class _TimetableViewState extends State<_TimetableView> {
               ),
               const SizedBox(width: 14),
 
-              // Thông tin môn học & phòng học dạng badge
+              // 3. Thông tin môn học & địa điểm phòng/tòa
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       subject?.name ?? slot.subjectId,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
@@ -664,10 +974,14 @@ class _TimetableViewState extends State<_TimetableView> {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
+                        // Badge phòng học có chữ rõ ràng
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            color: slot.room.trim().isEmpty
+                                ? theme.colorScheme.surfaceContainerHighest
+                                : theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Row(
@@ -675,25 +989,29 @@ class _TimetableViewState extends State<_TimetableView> {
                             children: [
                               Icon(
                                 Icons.meeting_room_outlined,
-                                size: 12,
-                                color: theme.colorScheme.onSurfaceVariant,
+                                size: 14,
+                                color: theme.colorScheme.primary,
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                slot.room,
+                                roomDisplay,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        if (slot.buildingId != null && slot.buildingId!.isNotEmpty)
+                        // Badge tòa nhà
+                        if (slot.buildingId != null &&
+                            slot.buildingId!.isNotEmpty)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                              color: theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
@@ -701,15 +1019,15 @@ class _TimetableViewState extends State<_TimetableView> {
                               children: [
                                 Icon(
                                   Icons.business_outlined,
-                                  size: 12,
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  size: 14,
+                                  color: theme.colorScheme.outline,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  slot.buildingId!,
+                                  'Tòa ${slot.buildingId}',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -720,15 +1038,19 @@ class _TimetableViewState extends State<_TimetableView> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
 
-              // Nút bật/tắt nhắc giờ
-              Switch(
-                value: isReminderActive,
-                onChanged: (active) {
-                  context
-                      .read<TimetableBloc>()
-                      .add(ToggleSlotReminderEvent(slot.id));
-                },
+              // 4. Switch thông báo gọn gàng
+              Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  value: isReminderActive,
+                  onChanged: (active) {
+                    context
+                        .read<TimetableBloc>()
+                        .add(ToggleSlotReminderEvent(slot.id));
+                  },
+                ),
               ),
             ],
           ),
@@ -782,7 +1104,6 @@ class _TimetableViewState extends State<_TimetableView> {
           required int repeatWeeks,
         }) async {
           await _handleSaveSlot(
-            context: context,
             subjectName: subjectName,
             room: room,
             building: building,
@@ -797,7 +1118,6 @@ class _TimetableViewState extends State<_TimetableView> {
   }
 
   Future<void> _handleSaveSlot({
-    required BuildContext context,
     required String subjectName,
     required String room,
     String? building,
@@ -865,18 +1185,23 @@ class _TimetableViewState extends State<_TimetableView> {
 
     await repo.saveSlots(slotsToSave);
 
-    if (context.mounted) {
-      final msg = repeatWeeks > 1
-          ? 'Đã thêm $repeatWeeks ca học môn "$subjectName" thành công!'
-          : 'Đã thêm lịch "$subjectName" thành công!';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    if (!mounted) return;
+
+    setState(() {
+      _focusedDay = startDate;
+    });
+    context.read<TimetableBloc>().add(DaySelectedEvent(startDate));
+
+    final msg = repeatWeeks > 1
+        ? 'Đã thêm $repeatWeeks ca học môn "$subjectName" thành công!'
+        : 'Đã thêm lịch "$subjectName" thành công!';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 }
 
@@ -964,8 +1289,8 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _startDate,
-      firstDate: DateTime(2025),
-      lastDate: DateTime(2030),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
     );
     if (picked != null) {
       setState(() {
@@ -1034,11 +1359,17 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
       if (mounted) {
         Navigator.of(context).pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isSaving = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể lưu ca học: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -1148,17 +1479,12 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
                       key: const ValueKey('add_slot_room_field'),
                       controller: _roomController,
                       decoration: const InputDecoration(
-                        labelText: 'Phòng học / Địa điểm *',
+                        labelText: 'Phòng học / Địa điểm (tùy chọn)',
                         hintText: 'VD: H2.304 hoặc Online',
                         prefixIcon: Icon(Icons.room_outlined),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Vui lòng nhập phòng';
-                        }
-                        return null;
-                      },
+                      validator: null,
                     ),
                   ),
                   const SizedBox(width: 12),

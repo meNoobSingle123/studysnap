@@ -575,6 +575,27 @@ class _NoteCard extends StatelessWidget {
     final formattedDate =
         '${note.updatedAt.day.toString().padLeft(2, '0')}/${note.updatedAt.month.toString().padLeft(2, '0')}/${note.updatedAt.year}';
 
+    // Hiển thị tên môn thân thiện, không bao giờ để lộ chuỗi UUID thô
+    final subjectDisplayName = subject?.name.isNotEmpty == true
+        ? subject!.name
+        : (note.subjectId.isEmpty || note.subjectId == 'general'
+            ? 'Chung'
+            : (note.subjectId.contains('-') && note.subjectId.length >= 20
+                ? 'Môn học'
+                : note.subjectId));
+
+    // Làm sạch tiêu đề nếu trước đó lưu chuỗi UUID thô
+    final rawTitle = note.title.trim();
+    final cleanTitle = rawTitle.isEmpty
+        ? AppStrings.untitledNote
+        : (rawTitle.startsWith('Ghi chú:') &&
+                rawTitle.contains('-') &&
+                rawTitle.length > 25
+            ? (subject?.name.isNotEmpty == true
+                ? 'Ghi chú: ${subject!.name}'
+                : 'Ghi chú bài giảng')
+            : rawTitle);
+
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 10),
@@ -594,23 +615,27 @@ class _NoteCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Badges & Actions Row
+              // Top Badges & Actions Row (Flexible chống tràn chiều ngang)
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: subjectColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      subject?.name ?? note.subjectId,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: subjectColor,
-                        fontWeight: FontWeight.bold,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: subjectColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        subjectDisplayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: subjectColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -677,7 +702,7 @@ class _NoteCard extends StatelessWidget {
 
               // Title in đậm vừa phải
               Text(
-                note.title.isNotEmpty ? note.title : AppStrings.untitledNote,
+                cleanTitle,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

@@ -90,3 +90,12 @@ class RemoveImage extends NoteEditorEvent {
   List<Object?> get props => [imagePath];
 }
 
+/// Updates the subject ID for the current note.
+class UpdateSubject extends NoteEditorEvent {
+  final String subjectId;
+  const UpdateSubject(this.subjectId);
+
+  @override
+  List<Object?> get props => [subjectId];
+}
+

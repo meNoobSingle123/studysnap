@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -215,18 +216,28 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
   // ============================================================================
 
   Future<TimetableExportData> _loadTimetableData() async {
-    final subjects = await timetableRepository.getSubjects();
-    final slots = await timetableRepository.watchAllSlots().first;
-    final exams = await timetableRepository.getExams();
-    final buildings = await timetableRepository.getBuildings();
+    try {
+      final subjects = await timetableRepository.getSubjects();
+      final slots = await timetableRepository.watchAllSlots().first;
+      final exams = await timetableRepository.getExams();
+      final buildings = await timetableRepository.getBuildings();
 
-    return TimetableExportData(
-      term: 'Học kỳ 2026-1',
-      subjects: subjects,
-      slots: slots,
-      exams: exams,
-      buildings: buildings,
-    );
+      return TimetableExportData(
+        term: 'Học kỳ 2026-1',
+        subjects: subjects,
+        slots: slots,
+        exams: exams,
+        buildings: buildings,
+      );
+    } catch (_) {
+      return const TimetableExportData(
+        term: 'Học kỳ 2026-1',
+        subjects: [],
+        slots: [],
+        exams: [],
+        buildings: [],
+      );
+    }
   }
 
   Future<NoteExportData?> _buildNoteExportData(
@@ -254,11 +265,26 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
       matchedSlot = await timetableRepository.getSlotById(targetNote.slotId!);
     }
 
+    final imageBytesList = <Uint8List>[];
+    for (final path in targetNote.imagePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          if (bytes.isNotEmpty) {
+            imageBytesList.add(bytes);
+          }
+        }
+      } catch (_) {
+        // Skip unreadable image file
+      }
+    }
+
     return NoteExportData(
       note: targetNote,
       subject: matchedSubject,
       slot: matchedSlot,
-      imageBytesList: const [],
+      imageBytesList: imageBytesList,
     );
   }
 
