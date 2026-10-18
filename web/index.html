@@ -41,6 +41,64 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <style>
+    #fullscreen-btn {
+      position: fixed;
+      bottom: 85px;
+      right: 16px;
+      z-index: 999999;
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 30px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #fullscreen-btn:active {
+      transform: scale(0.94);
+      background: #1d4ed8;
+    }
+  </style>
+  <button id="fullscreen-btn" onclick="toggleFullscreen()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    <span>Toàn màn hình</span>
+  </button>
+  <script>
+    function toggleFullscreen() {
+      const doc = document.documentElement;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (doc.requestFullscreen) {
+          doc.requestFullscreen();
+        } else if (doc.webkitRequestFullscreen) {
+          doc.webkitRequestFullscreen();
+        }
+        document.getElementById('fullscreen-btn').style.display = 'none';
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+    }
+    document.addEventListener('fullscreenchange', () => {
+      const btn = document.getElementById('fullscreen-btn');
+      if (btn) btn.style.display = document.fullscreenElement ? 'none' : 'flex';
+    });
+    document.addEventListener('webkitfullscreenchange', () => {
+      const btn = document.getElementById('fullscreen-btn');
+      if (btn) btn.style.display = document.webkitFullscreenElement ? 'none' : 'flex';
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
