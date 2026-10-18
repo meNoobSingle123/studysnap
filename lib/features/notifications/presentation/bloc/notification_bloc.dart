@@ -99,13 +99,19 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         leadMinutes: lead,
       );
 
-      final pending = await notificationService.getPendingReminders();
+      int pendingCount = count;
+      try {
+        final pending = await notificationService.getPendingReminders();
+        if (pending.isNotEmpty) {
+          pendingCount = pending.length;
+        }
+      } catch (_) {}
 
       emit(NotificationLoaded(
         isNotificationGranted: current.isNotificationGranted,
         isExactAlarmGranted: current.isExactAlarmGranted,
         leadMinutes: lead,
-        pendingCount: pending.length,
+        pendingCount: pendingCount,
         feedbackMessage: 'Đã lên lịch thành công $count ca học trong 7 ngày tới (nhắc trước $lead phút).',
       ));
     } catch (e) {

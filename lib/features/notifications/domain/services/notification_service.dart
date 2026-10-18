@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -70,6 +71,7 @@ class NotificationService {
 
   /// Xin quyền hiển thị thông báo (`POST_NOTIFICATIONS` trên Android 13+).
   Future<bool> requestNotificationPermissions() async {
+    if (kIsWeb) return true;
     try {
       final status = await Permission.notification.request();
       return status.isGranted;
@@ -80,6 +82,7 @@ class NotificationService {
 
   /// Kiểm tra trạng thái cấp quyền thông báo.
   Future<bool> isNotificationPermissionGranted() async {
+    if (kIsWeb) return true;
     try {
       return await Permission.notification.status.isGranted;
     } catch (_) {
@@ -89,6 +92,7 @@ class NotificationService {
 
   /// Kiểm tra quyền đặt báo thức chính xác (`SCHEDULE_EXACT_ALARM` trên Android 12+).
   Future<bool> isExactAlarmPermissionGranted() async {
+    if (kIsWeb) return true;
     try {
       return await Permission.scheduleExactAlarm.status.isGranted;
     } catch (_) {
@@ -112,13 +116,15 @@ class NotificationService {
     );
     const notificationDetails = NotificationDetails(android: androidDetails);
 
-    await localNotificationsPlugin.show(
-      id: id,
-      title: title,
-      body: body,
-      notificationDetails: notificationDetails,
-      payload: payload,
-    );
+    try {
+      await localNotificationsPlugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: notificationDetails,
+        payload: payload,
+      );
+    } catch (_) {}
 
   }
 
@@ -180,15 +186,19 @@ class NotificationService {
           );
           const notificationDetails = NotificationDetails(android: androidDetails);
 
-          await localNotificationsPlugin.zonedSchedule(
-            id: reminderId,
-            title: 'Sắp đến ca học: $subjectName',
-            body: 'Bắt đầu lúc ${slot.startTimeFormatted} tại Phòng ${slot.room}${slot.buildingId != null ? ' (Tòa ${slot.buildingId})' : ''}',
-            scheduledDate: tzScheduledTime,
-            notificationDetails: notificationDetails,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            payload: 'studysnap://slot?id=${slot.id}',
-          );
+          if (!kIsWeb) {
+            try {
+              await localNotificationsPlugin.zonedSchedule(
+                id: reminderId,
+                title: 'Sắp đến ca học: $subjectName',
+                body: 'Bắt đầu lúc ${slot.startTimeFormatted} tại Phòng ${slot.room}${slot.buildingId != null ? ' (Tòa ${slot.buildingId})' : ''}',
+                scheduledDate: tzScheduledTime,
+                notificationDetails: notificationDetails,
+                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                payload: 'studysnap://slot?id=${slot.id}',
+              );
+            } catch (_) {}
+          }
 
           scheduledCount++;
           if (scheduledCount >= maxRemindersQuota) break;
@@ -201,17 +211,24 @@ class NotificationService {
 
   /// Hủy một thông báo nhắc giờ theo ID.
   Future<void> cancelReminder(int id) async {
-    await localNotificationsPlugin.cancel(id: id);
+    try {
+      await localNotificationsPlugin.cancel(id: id);
+    } catch (_) {}
   }
-
 
   /// Hủy toàn bộ các thông báo đã lên lịch.
   Future<void> cancelAllReminders() async {
-    await localNotificationsPlugin.cancelAll();
+    try {
+      await localNotificationsPlugin.cancelAll();
+    } catch (_) {}
   }
 
   /// Lấy danh sách các thông báo đang chờ phát.
   Future<List<PendingNotificationRequest>> getPendingReminders() async {
-    return localNotificationsPlugin.pendingNotificationRequests();
+    try {
+      return await localNotificationsPlugin.pendingNotificationRequests();
+    } catch (_) {
+      return [];
+    }
   }
 }
