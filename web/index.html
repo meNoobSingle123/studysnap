@@ -90,6 +90,16 @@
         }
       }
     }
+    function requestAutoFullscreen() {
+      const doc = document.documentElement;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (doc.requestFullscreen) {
+          doc.requestFullscreen().catch(() => {});
+        } else if (doc.webkitRequestFullscreen) {
+          doc.webkitRequestFullscreen().catch(() => {});
+        }
+      }
+    }
     document.addEventListener('fullscreenchange', () => {
       const btn = document.getElementById('fullscreen-btn');
       if (btn) btn.style.display = document.fullscreenElement ? 'none' : 'flex';
@@ -98,7 +108,19 @@
       const btn = document.getElementById('fullscreen-btn');
       if (btn) btn.style.display = document.webkitFullscreenElement ? 'none' : 'flex';
     });
+    // Tự động khôi phục toàn màn hình khi người dùng chạm hoặc trở lại từ camera
+    document.addEventListener('touchstart', requestAutoFullscreen, { passive: true });
+    document.addEventListener('click', requestAutoFullscreen, { passive: true });
+    window.addEventListener('focus', () => {
+      setTimeout(requestAutoFullscreen, 150);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        setTimeout(requestAutoFullscreen, 150);
+      }
+    });
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
+

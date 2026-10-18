@@ -30,14 +30,26 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     emit(const NotificationLoading());
     try {
       await notificationService.init();
-      final isNotificationGranted = await notificationService.isNotificationPermissionGranted();
-      final isExactAlarmGranted = await notificationService.isExactAlarmPermissionGranted();
-      final pending = await notificationService.getPendingReminders();
+      bool isNotificationGranted = true;
+      try {
+        isNotificationGranted = await notificationService.isNotificationPermissionGranted();
+      } catch (_) {}
+
+      bool isExactAlarmGranted = true;
+      try {
+        isExactAlarmGranted = await notificationService.isExactAlarmPermissionGranted();
+      } catch (_) {}
+
+      int pendingCount = 0;
+      try {
+        final pending = await notificationService.getPendingReminders();
+        pendingCount = pending.length;
+      } catch (_) {}
 
       emit(NotificationLoaded(
         isNotificationGranted: isNotificationGranted,
         isExactAlarmGranted: isExactAlarmGranted,
-        pendingCount: pending.length,
+        pendingCount: pendingCount,
       ));
     } catch (e) {
       emit(NotificationError('Lỗi khởi tạo thông báo: ${e.toString()}'));

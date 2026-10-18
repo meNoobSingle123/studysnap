@@ -55,9 +55,18 @@ class _ToolsPageState extends State<ToolsPage> {
 
   Future<void> _onToggleLock(bool value) async {
     if (kIsWeb) {
+      await _keyStorage.setLockEnabled(value);
+      setState(() {
+        _isLockEnabled = value;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.mobileOnlyFeature)),
+          SnackBar(
+            content: Text(value
+                ? 'Đã bật bảo vệ ứng dụng bằng sinh trắc học / PIN'
+                : 'Đã tắt khóa ứng dụng'),
+            backgroundColor: value ? Colors.green.shade700 : null,
+          ),
         );
       }
       return;

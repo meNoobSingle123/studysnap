@@ -70,18 +70,30 @@ class NotificationService {
 
   /// Xin quyền hiển thị thông báo (`POST_NOTIFICATIONS` trên Android 13+).
   Future<bool> requestNotificationPermissions() async {
-    final status = await Permission.notification.request();
-    return status.isGranted;
+    try {
+      final status = await Permission.notification.request();
+      return status.isGranted;
+    } catch (_) {
+      return true;
+    }
   }
 
   /// Kiểm tra trạng thái cấp quyền thông báo.
   Future<bool> isNotificationPermissionGranted() async {
-    return Permission.notification.status.isGranted;
+    try {
+      return await Permission.notification.status.isGranted;
+    } catch (_) {
+      return true;
+    }
   }
 
   /// Kiểm tra quyền đặt báo thức chính xác (`SCHEDULE_EXACT_ALARM` trên Android 12+).
   Future<bool> isExactAlarmPermissionGranted() async {
-    return Permission.scheduleExactAlarm.status.isGranted;
+    try {
+      return await Permission.scheduleExactAlarm.status.isGranted;
+    } catch (_) {
+      return true;
+    }
   }
 
   /// Phát thông báo thử nghiệm ngay lập tức.

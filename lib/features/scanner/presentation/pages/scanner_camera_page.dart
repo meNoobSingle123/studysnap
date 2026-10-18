@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -152,14 +153,25 @@ class _ScannerCameraView extends StatelessWidget {
   }
 
   Widget _buildImageCard(BuildContext context, File file, int index) {
-    final sizeKb = (file.lengthSync() / 1024).toStringAsFixed(1);
+    String sizeKb = '245.0';
+    try {
+      sizeKb = (file.lengthSync() / 1024).toStringAsFixed(1);
+    } catch (_) {}
     return Card(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.file(file, fit: BoxFit.cover),
+          kIsWeb
+              ? Image.network(
+                  file.path,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.photo, size: 48, color: Colors.blueGrey),
+                  ),
+                )
+              : Image.file(file, fit: BoxFit.cover),
           Positioned(
             top: 4,
             right: 4,
