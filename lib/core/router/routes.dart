@@ -4,6 +4,7 @@ abstract final class Routes {
   static const String timetable = '/timetable';
   static const String notes = '/notes';
   static const String tools = '/tools';
+  static const String onboarding = '/onboarding';
 
   // Notes Feature
   static const String noteEditor = '/notes/edit/:id';

@@ -11,6 +11,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class KeyStorageService {
   static const String kDbEncryptionKeyName = 'db_encryption_key_v1';
   static const String kAppLockEnabledKey = 'is_app_lock_enabled';
+  static const String kGeminiApiKeyName = 'gemini_api_key_v1';
+  static const String kOnboardingCompletedKey = 'is_onboarding_completed_v1';
 
   final FlutterSecureStorage _storage;
 
@@ -77,6 +79,56 @@ class KeyStorageService {
     } catch (_) {
       // Platform channels may not be available in headless tests
     }
+  }
+
+  static const String kDefaultApiKey =
+      String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+
+  /// Lấy khóa AI API Key đã lưu hoặc sử dụng khóa mặc định được cấu hình an toàn qua env.json / dart-define.
+  Future<String?> getGeminiApiKey() async {
+    try {
+      final savedKey = await _storage.read(key: kGeminiApiKeyName);
+      if (savedKey != null && savedKey.trim().isNotEmpty) {
+        return savedKey.trim();
+      }
+      return kDefaultApiKey.isNotEmpty ? kDefaultApiKey : null;
+    } catch (_) {
+      return kDefaultApiKey.isNotEmpty ? kDefaultApiKey : null;
+    }
+  }
+
+  /// Lưu khóa Gemini API Key vào secure storage.
+  Future<void> saveGeminiApiKey(String apiKey) async {
+    try {
+      await _storage.write(key: kGeminiApiKeyName, value: apiKey.trim());
+    } catch (_) {}
+  }
+
+  /// Xóa khóa Gemini API Key.
+  Future<void> clearGeminiApiKey() async {
+    try {
+      await _storage.delete(key: kGeminiApiKeyName);
+    } catch (_) {}
+  }
+
+  /// Kiểm tra xem người dùng đã hoàn thành màn hình chào mừng/giới thiệu chưa.
+  Future<bool> isOnboardingCompleted() async {
+    try {
+      final val = await _storage.read(key: kOnboardingCompletedKey);
+      return val == 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Đánh dấu đã xem xong màn hình chào mừng/giới thiệu.
+  Future<void> setOnboardingCompleted(bool completed) async {
+    try {
+      await _storage.write(
+        key: kOnboardingCompletedKey,
+        value: completed ? 'true' : 'false',
+      );
+    } catch (_) {}
   }
 
   /// Xóa khóa mã hóa khỏi secure storage.

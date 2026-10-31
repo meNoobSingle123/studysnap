@@ -2,8 +2,24 @@ import 'package:flutter/material.dart';
 
 /// Application theme configurations supporting Material 3 Light & Dark modes.
 abstract final class AppTheme {
-  // Brand seed color (Google Blue)
-  static const Color primarySeedColor = Color(0xFF1A73E8);
+  // Brand seed color (Academic Slate Indigo)
+  static const Color primarySeedColor = Color(0xFF5E48E8);
+
+  // Soft pastel color palette for subjects (clean student theme)
+  static const List<Color> subjectPastelColors = [
+    Color(0xFFE8F5E9), // Light mint green
+    Color(0xFFE3F2FD), // Light sky blue
+    Color(0xFFF3E5F5), // Light lavender
+    Color(0xFFFFF3E0), // Light peach orange
+    Color(0xFFFCE4EC), // Light rose pink
+    Color(0xFFE0F7FA), // Light cyan
+    Color(0xFFFFFDE7), // Light soft yellow
+  ];
+
+  /// Returns a matching pastel color for a given subject seed/index.
+  static Color getSubjectPastelColor(int index) {
+    return subjectPastelColors[index.abs() % subjectPastelColors.length];
+  }
 
   // Light Theme
   static ThemeData get lightTheme {
@@ -27,7 +43,7 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.6),
             width: 1,
@@ -89,7 +105,7 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.6),
             width: 1,

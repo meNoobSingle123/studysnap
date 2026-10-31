@@ -8,6 +8,7 @@ import '../../features/notes/presentation/pages/note_editor_page.dart';
 import '../../features/notes/presentation/pages/notes_page.dart';
 import '../../features/notifications/presentation/pages/notification_settings_page.dart';
 import '../../features/ocr/ocr_scanner_page.dart';
+import '../../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../../features/scanner/presentation/pages/scanner_camera_page.dart';
 import '../../features/security/presentation/pages/app_lock_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
@@ -16,6 +17,7 @@ import '../../features/timetable/presentation/pages/slot_detail_page.dart';
 
 import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../l10n/strings.dart';
+import '../security/app_onboarding_listenable.dart';
 import '../security/auth_lock_listenable.dart';
 import 'routes.dart';
 
@@ -27,7 +29,10 @@ abstract final class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: Routes.timetable,
-    refreshListenable: AuthLockListenable.instance,
+    refreshListenable: Listenable.merge([
+      AuthLockListenable.instance,
+      AppOnboardingListenable.instance,
+    ]),
     redirect: (context, state) {
       final isLockLocation = state.matchedLocation == Routes.lock;
       final isLockEnabled = AuthLockListenable.instance.isLockEnabled;
@@ -35,6 +40,13 @@ abstract final class AppRouter {
 
       if (isLockEnabled && isLocked) {
         return isLockLocation ? null : Routes.lock;
+      }
+
+      final isOnboardingCompleted = AppOnboardingListenable.instance.isCompleted;
+      final isOnboardingLocation = state.matchedLocation == Routes.onboarding;
+
+      if (!isOnboardingCompleted) {
+        return isOnboardingLocation ? null : Routes.onboarding;
       }
 
       if (isLockLocation || state.matchedLocation == Routes.home) {
@@ -48,6 +60,11 @@ abstract final class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: Routes.lock,
         builder: (context, state) => const AppLockPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.onboarding,
+        builder: (context, state) => const OnboardingPage(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

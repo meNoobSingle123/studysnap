@@ -26,6 +26,7 @@ class _NotificationSettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -78,14 +79,14 @@ class _NotificationSettingsView extends StatelessWidget {
               Card(
                 elevation: 0,
                 color: loaded.isNotificationGranted
-                    ? Colors.green.shade50
-                    : Colors.amber.shade50,
+                    ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+                    : colorScheme.errorContainer.withValues(alpha: 0.35),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
                     color: loaded.isNotificationGranted
-                        ? Colors.green.shade200
-                        : Colors.amber.shade300,
+                        ? colorScheme.primary.withValues(alpha: 0.35)
+                        : colorScheme.error.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Padding(
@@ -100,8 +101,8 @@ class _NotificationSettingsView extends StatelessWidget {
                                 ? Icons.check_circle_rounded
                                 : Icons.warning_amber_rounded,
                             color: loaded.isNotificationGranted
-                                ? Colors.green.shade700
-                                : Colors.amber.shade800,
+                                ? colorScheme.primary
+                                : colorScheme.error,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -112,8 +113,8 @@ class _NotificationSettingsView extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: loaded.isNotificationGranted
-                                    ? Colors.green.shade900
-                                    : Colors.amber.shade900,
+                                    ? colorScheme.onSurface
+                                    : colorScheme.error,
                               ),
                             ),
                           ),
@@ -126,9 +127,7 @@ class _NotificationSettingsView extends StatelessWidget {
                             : 'Vui lòng cấp quyền để nhận cảnh báo ca học sắp diễn ra.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: loaded.isNotificationGranted
-                              ? Colors.green.shade900
-                              : Colors.amber.shade900,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       if (!loaded.isNotificationGranted) ...[
@@ -171,11 +170,12 @@ class _NotificationSettingsView extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       SegmentedButton<int>(
+                        showSelectedIcon: false,
                         segments: const [
-                          ButtonSegment(value: 5, label: Text('5p')),
-                          ButtonSegment(value: 10, label: Text('10p')),
-                          ButtonSegment(value: 15, label: Text('15p (chuẩn)')),
-                          ButtonSegment(value: 30, label: Text('30p')),
+                          ButtonSegment(value: 5, label: Text('5 phút')),
+                          ButtonSegment(value: 10, label: Text('10 phút')),
+                          ButtonSegment(value: 15, label: Text('15 phút')),
+                          ButtonSegment(value: 30, label: Text('30 phút')),
                         ],
                         selected: {loaded.leadMinutes},
                         onSelectionChanged: (selection) {

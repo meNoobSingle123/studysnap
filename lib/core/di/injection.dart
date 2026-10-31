@@ -5,6 +5,12 @@ import 'package:get_it/get_it.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../features/ai_assistant/data/datasources/gemini_remote_datasource.dart';
+import '../../features/ai_assistant/data/repositories/ai_assistant_repository_impl.dart';
+import '../../features/ai_assistant/domain/repositories/ai_assistant_repository.dart';
+import '../../features/ai_assistant/domain/usecases/generate_quiz_usecase.dart';
+import '../../features/ai_assistant/domain/usecases/summarize_note_usecase.dart';
+import '../../features/ai_assistant/presentation/bloc/ai_assistant_bloc.dart';
 import '../../features/export/domain/services/pdf_generator_service.dart';
 import '../../features/export/presentation/bloc/pdf_export_bloc.dart';
 import '../../features/notes/data/repositories/hive_note_repository.dart';
@@ -31,6 +37,7 @@ import '../../features/timetable/domain/usecases/get_subjects_usecase.dart';
 import '../../features/timetable/domain/usecases/get_timetable_slots_usecase.dart';
 import '../../features/timetable/domain/usecases/save_subject_usecase.dart';
 import '../network/dio_client.dart';
+import '../security/app_onboarding_listenable.dart';
 import '../security/bloc/auth_lock_bloc.dart';
 import '../security/key_storage_service.dart';
 
@@ -61,6 +68,19 @@ Future<void> configureDependencies({bool isTest = false}) async {
   getIt.registerLazySingleton<KeyStorageService>(
     () => KeyStorageService(storage: getIt<FlutterSecureStorage>()),
   );
+
+  // Initialize Onboarding state
+  if (isTest) {
+    AppOnboardingListenable.instance.setCompleted(true);
+  } else {
+    try {
+      final onboardingDone =
+          await getIt<KeyStorageService>().isOnboardingCompleted();
+      AppOnboardingListenable.instance.setCompleted(onboardingDone);
+    } catch (_) {
+      AppOnboardingListenable.instance.setCompleted(true);
+    }
+  }
 
   // Network & Core Client
   getIt.registerLazySingleton<DioClient>(
@@ -182,6 +202,32 @@ Future<void> configureDependencies({bool isTest = false}) async {
     () => NotificationBloc(
       notificationService: getIt<NotificationService>(),
       timetableRepository: getIt<TimetableRepository>(),
+    ),
+  );
+
+  // AI Assistant Module (Gemini AI Smart Features)
+  getIt.registerLazySingleton<GeminiRemoteDataSource>(
+    () => GeminiRemoteDataSourceImpl(
+      dioClient: getIt<DioClient>(),
+      keyStorageService: getIt<KeyStorageService>(),
+    ),
+  );
+  getIt.registerLazySingleton<AiAssistantRepository>(
+    () => AiAssistantRepositoryImpl(
+      remoteDataSource: getIt<GeminiRemoteDataSource>(),
+    ),
+  );
+  getIt.registerLazySingleton<SummarizeNoteUseCase>(
+    () => SummarizeNoteUseCase(getIt<AiAssistantRepository>()),
+  );
+  getIt.registerLazySingleton<GenerateQuizUseCase>(
+    () => GenerateQuizUseCase(getIt<AiAssistantRepository>()),
+  );
+  getIt.registerFactory<AiAssistantBloc>(
+    () => AiAssistantBloc(
+      summarizeNoteUseCase: getIt<SummarizeNoteUseCase>(),
+      generateQuizUseCase: getIt<GenerateQuizUseCase>(),
+      repository: getIt<AiAssistantRepository>(),
     ),
   );
 }

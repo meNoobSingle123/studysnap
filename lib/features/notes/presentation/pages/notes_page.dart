@@ -11,6 +11,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
 import '../../../timetable/domain/entities/subject.dart';
+import '../../../ai_assistant/presentation/widgets/ai_assistant_bottom_sheet.dart';
 import '../../data/repositories/in_memory_note_repository.dart';
 import '../../domain/entities/lecture_note.dart';
 import '../../domain/repositories/note_repository.dart';
@@ -109,13 +110,17 @@ class _NotesPageState extends State<NotesPage> {
                       final dateStr = dateFormat.format(note.updatedAt);
 
                       return Card(
-                        elevation: 1,
+                        elevation: 0,
                         margin: const EdgeInsets.only(bottom: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6),
+                            width: 1,
+                          ),
                         ),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           onTap: () => _openNoteEditor(note.id),
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
@@ -262,6 +267,103 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
     }
   }
 
+  void _openAiAssistant(BuildContext context, List<LectureNote> notes) {
+    if (notes.isEmpty) {
+      AiAssistantBottomSheet.show(
+        context: context,
+        noteTitle: 'Khám phá Trợ lý Học tập AI',
+        noteContent:
+            'Trợ lý học tập thông minh StudySnap hỗ trợ sinh viên tóm tắt bài giảng nhanh chóng, trích xuất các ý chính, khái niệm quan trọng và tạo các câu hỏi trắc nghiệm Active Recall để chuẩn bị cho kỳ thi.',
+        subjectName: 'Hướng dẫn học tập',
+      );
+      return;
+    }
+
+    if (notes.length == 1) {
+      final note = notes.first;
+      AiAssistantBottomSheet.show(
+        context: context,
+        noteTitle: note.title.isNotEmpty ? note.title : 'Ghi chú bài học',
+        noteContent: note.bodyText.isNotEmpty
+            ? note.bodyText
+            : 'Bài giảng chưa có nội dung văn bản.',
+        subjectName: note.subjectId,
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, color: Color(0xFF5E48E8)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Chọn bài giảng để AI phân tích',
+                      style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: notes.length,
+                  itemBuilder: (ctx, i) {
+                    final n = notes[i];
+                    return ListTile(
+                      leading: const Icon(Icons.description_outlined),
+                      title: Text(
+                        n.title.isNotEmpty ? n.title : 'Ghi chú ${i + 1}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        n.bodyText.isNotEmpty
+                            ? n.bodyText
+                            : 'Chưa có nội dung văn bản',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () {
+                        Navigator.of(sheetCtx).pop();
+                        AiAssistantBottomSheet.show(
+                          context: context,
+                          noteTitle: n.title,
+                          noteContent: n.bodyText.isNotEmpty
+                              ? n.bodyText
+                              : 'Bài giảng ${n.title}',
+                          subjectName: n.subjectId,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -406,6 +508,76 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
                         },
                       ),
                   ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+
+          // 2.5 Thẻ Trợ lý AI Gemini Học tập (AI Study Hub)
+          BlocBuilder<NoteListBloc, NoteListState>(
+            builder: (context, state) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Trợ lý Học tập AI',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            Text(
+                              'Tóm tắt bài học & Tạo trắc nghiệm ôn thi',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () => _openAiAssistant(context, state.allNotes),
+                        child: const Text('Mở AI ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -600,7 +772,7 @@ class _NoteCard extends StatelessWidget {
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
           width: 1,
@@ -608,7 +780,7 @@ class _NoteCard extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),

@@ -10,6 +10,7 @@
 .history
 .svn/
 .swiftpm/
+**/xcshareddata/swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -58,6 +59,11 @@ skills-lock.json
 
 # Markdown documents
 *.md
+
+# Environment & Secrets
+env.json
+*.env
+.env*
 
 # Node / Backend
 node_modules/

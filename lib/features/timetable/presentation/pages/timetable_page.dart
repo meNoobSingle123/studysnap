@@ -17,6 +17,8 @@ import '../../domain/repositories/timetable_repository.dart';
 import '../../domain/usecases/get_subjects_usecase.dart';
 import '../../domain/usecases/get_timetable_slots_usecase.dart';
 import '../bloc/timetable_bloc.dart';
+import '../widgets/quick_study_card.dart';
+import '../widgets/timetable_grid_view.dart';
 
 /// Màn hình Thời khóa biểu (S02, CĐ 2).
 /// Hỗ trợ kéo để làm mới (FR-03) và nút đồng bộ API theo Chương 5.
@@ -272,6 +274,7 @@ class _TimetableView extends StatefulWidget {
 }
 
 class _TimetableViewState extends State<_TimetableView> {
+  bool _isGridView = true;
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
 
@@ -412,43 +415,93 @@ class _TimetableViewState extends State<_TimetableView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.timetableTitle),
+        titleSpacing: 12,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              AppStrings.timetableTitle,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            Text(
+              'Tháng ${_focusedDay.month}/${_focusedDay.year}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          // Nút Làm mới cục bộ (Local-First, không gọi mạng)
-          IconButton(
-            tooltip: 'Làm mới lịch',
-            icon: const Icon(Icons.refresh_rounded),
+          // Nút "Hôm nay": 1-chạm quay lại ngày hiện tại
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.today_rounded, size: 16),
+            label: const Text('Hôm nay', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             onPressed: () {
-              context
-                  .read<TimetableBloc>()
-                  .add(DaySelectedEvent(_focusedDay));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã làm mới dữ liệu thời khóa biểu.'),
-                  duration: Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              final now = DateTime.now();
+              setState(() => _focusedDay = now);
+              context.read<TimetableBloc>().add(DaySelectedEvent(now));
             },
           ),
-          // Nút xuất PDF Thời khóa biểu (S09)
+          // Nút chuyển chế độ xem: Bảng lưới (Grid như ảnh) <-> Lịch ngày (List)
           IconButton(
-            tooltip: AppStrings.pdfExportTitle,
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            onPressed: () => context.push(Routes.pdfExport),
+            tooltip: _isGridView
+                ? 'Xem dạng danh sách ngày'
+                : 'Xem dạng bảng lưới tuần (College Timetable)',
+            icon: Icon(
+              _isGridView
+                  ? Icons.calendar_view_day_outlined
+                  : Icons.grid_on_rounded,
+            ),
+            onPressed: () {
+              setState(() {
+                _isGridView = !_isGridView;
+              });
+            },
           ),
-          // Nút mở nhanh Dự phóng GPA (S04)
-          IconButton(
-            tooltip: AppStrings.gpaProjectionTitle,
-            icon: const Icon(Icons.calculate_outlined),
-            onPressed: () => context.push(Routes.gpaProjection),
-          ),
-          // Menu Tùy chọn dữ liệu thời khóa biểu (Dọn dẹp ca học mẫu & Đồng bộ từ xa)
+          // Nút chuyển chế độ xem: Tuần <-> Tháng
+          if (!_isGridView)
+            IconButton(
+              tooltip: _calendarFormat == CalendarFormat.week
+                  ? 'Xem dạng tháng'
+                  : 'Xem dạng tuần',
+              icon: Icon(
+                _calendarFormat == CalendarFormat.week
+                    ? Icons.calendar_month_outlined
+                    : Icons.view_week_outlined,
+              ),
+              onPressed: () {
+                setState(() {
+                  _calendarFormat = _calendarFormat == CalendarFormat.week
+                      ? CalendarFormat.month
+                      : CalendarFormat.week;
+                });
+              },
+            ),
+          // Menu 3 chấm tiện ích: Gom các tính năng phụ gọn gàng
           PopupMenuButton<String>(
-            tooltip: 'Tùy chọn dữ liệu',
+            tooltip: 'Tính năng & Dữ liệu',
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) async {
-              if (value == 'sync_api') {
+              if (value == 'gpa') {
+                context.push(Routes.gpaProjection);
+              } else if (value == 'pdf') {
+                context.push(Routes.pdfExport);
+              } else if (value == 'refresh') {
+                context
+                    .read<TimetableBloc>()
+                    .add(DaySelectedEvent(_focusedDay));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã làm mới dữ liệu thời khóa biểu.'),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else if (value == 'sync_api') {
                 widget.onSync();
               } else if (value == 'clear_mock') {
                 await _clearSystemSlots(context);
@@ -460,11 +513,41 @@ class _TimetableViewState extends State<_TimetableView> {
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
+                value: 'gpa',
+                child: Row(
+                  children: [
+                    Icon(Icons.calculate_outlined, size: 20, color: Colors.indigo),
+                    SizedBox(width: 10),
+                    Text('Dự phóng GPA học tập'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'pdf',
+                child: Row(
+                  children: [
+                    Icon(Icons.picture_as_pdf_outlined, size: 20, color: Colors.deepOrange),
+                    SizedBox(width: 10),
+                    Text('Xuất PDF thời khóa biểu'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 20, color: Colors.teal),
+                    SizedBox(width: 10),
+                    Text('Làm mới lịch học'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'sync_api',
                 child: Row(
                   children: [
-                    Icon(Icons.cloud_sync_outlined,
-                        size: 20, color: Colors.blueAccent),
+                    Icon(Icons.cloud_sync_outlined, size: 20, color: Colors.blueAccent),
                     SizedBox(width: 10),
                     Text('Đồng bộ máy chủ trường (API)'),
                   ],
@@ -475,8 +558,7 @@ class _TimetableViewState extends State<_TimetableView> {
                 value: 'clear_mock',
                 child: Row(
                   children: [
-                    Icon(Icons.cleaning_services_outlined,
-                        size: 20, color: Colors.blue),
+                    Icon(Icons.cleaning_services_outlined, size: 20, color: Colors.blue),
                     SizedBox(width: 10),
                     Text('Xóa ca mẫu (Chỉ giữ ca tự tạo)'),
                   ],
@@ -486,8 +568,7 @@ class _TimetableViewState extends State<_TimetableView> {
                 value: 'restore_mock',
                 child: Row(
                   children: [
-                    Icon(Icons.restore_page_outlined,
-                        size: 20, color: Colors.green),
+                    Icon(Icons.restore_page_outlined, size: 20, color: Colors.green),
                     SizedBox(width: 10),
                     Text('Khôi phục ca mẫu hệ thống'),
                   ],
@@ -498,8 +579,7 @@ class _TimetableViewState extends State<_TimetableView> {
                 value: 'clear_all',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_sweep_outlined,
-                        size: 20, color: Colors.red),
+                    Icon(Icons.delete_sweep_outlined, size: 20, color: Colors.red),
                     SizedBox(width: 10),
                     Text('Xóa toàn bộ thời khóa biểu'),
                   ],
@@ -521,6 +601,26 @@ class _TimetableViewState extends State<_TimetableView> {
 
           final loaded = state as TimetableLoaded;
 
+          if (_isGridView) {
+            return RefreshIndicator(
+              onRefresh: () async {
+                context
+                    .read<TimetableBloc>()
+                    .add(DaySelectedEvent(loaded.selectedDay));
+                await Future.delayed(const Duration(milliseconds: 300));
+              },
+              child: TimetableGridView(
+                allSlots: loaded.allSlots,
+                subjectsMap: loaded.subjectsMap,
+                onDataChanged: () {
+                  context
+                      .read<TimetableBloc>()
+                      .add(DaySelectedEvent(_focusedDay));
+                },
+              ),
+            );
+          }
+
           return RefreshIndicator(
             onRefresh: () async {
               context
@@ -531,43 +631,18 @@ class _TimetableViewState extends State<_TimetableView> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               children: [
-                if (widget.syncedData != null) ...[
-                  const SizedBox(height: 8),
-                  Card(
-                    elevation: 0,
-                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        children: [
-                          Icon(Icons.cloud_done_rounded, color: theme.colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Đã đồng bộ học kỳ: ${widget.syncedData!['termId'] ?? '2026-1'}',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 6),
 
-                const SizedBox(height: 8),
-
-                // 1. Table Calendar (Chủ đề 2: Lịch tuần / tháng)
+                // 1. Table Calendar (Chủ đề 2: Lịch tuần / tháng đặt trên cùng, gọn gàng)
                 Card(
                   elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 8),
                   color: theme.colorScheme.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(6.0),
                     child: TableCalendar<TimetableSlot>(
                       locale: 'vi_VN',
                       firstDay: DateTime(2020, 1, 1),
@@ -656,35 +731,65 @@ class _TimetableViewState extends State<_TimetableView> {
                   ),
                 ),
 
-                const SizedBox(height: 16),
-
-                // 2. Thẻ Đếm ngược ca học tiếp theo trong ngày
-                if (loaded.nextUpcomingSlot != null &&
-                    loaded.minutesUntilNextSlot != null)
-                  _buildCountdownCard(
-                    context,
-                    loaded.nextUpcomingSlot!,
-                    loaded.minutesUntilNextSlot!,
-                    loaded.subjectsMap,
+                // 2. Thẻ học nhanh / Smart Capsule (Chỉ hiện khi xem ngày hôm nay)
+                if (isSameDay(loaded.selectedDay, DateTime.now()))
+                  QuickStudyCard(
+                    nextSlot: loaded.nextUpcomingSlot,
+                    minutesUntilNextSlot: loaded.minutesUntilNextSlot,
+                    todaySlotsCount: loaded.daySlots.length,
+                    subjectsMap: loaded.subjectsMap,
                   ),
 
-                const SizedBox(height: 16),
+                if (widget.syncedData != null) ...[
+                  Card(
+                    elevation: 0,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cloud_done_rounded, color: theme.colorScheme.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Đã đồng bộ học kỳ: ${widget.syncedData!['termId'] ?? '2026-1'}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 6),
 
                 // 3. Tiêu đề danh sách ca học
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Danh sách ca học (${loaded.daySlots.length})',
+                      'Lịch học ${_formatWeekday(loaded.selectedDay.weekday)}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      _formatWeekday(loaded.selectedDay.weekday),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${loaded.daySlots.length} ca học',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -746,124 +851,15 @@ class _TimetableViewState extends State<_TimetableView> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey('add_slot_fab'),
-        heroTag: null,
-        onPressed: () => _showAddSlotModal(context),
-        icon: const Icon(Icons.add),
-        label: const Text(AppStrings.addSlot),
-      ),
-    );
-  }
-
-  Widget _buildCountdownCard(
-    BuildContext context,
-    TimetableSlot slot,
-    int minutesDiff,
-    Map<String, Subject> subjectsMap,
-  ) {
-    final theme = Theme.of(context);
-    final subject = subjectsMap[slot.subjectId];
-    final hours = minutesDiff ~/ 60;
-    final mins = minutesDiff % 60;
-
-    final countdownStr = hours > 0 ? '$hours giờ $mins phút' : '$mins phút';
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => context.push(Routes.slotDetailRoute(slot.id)),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primaryContainer,
-              theme.colorScheme.surfaceContainerHigh,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      floatingActionButton: _isGridView
+          ? null
+          : FloatingActionButton.extended(
+              key: const ValueKey('add_slot_fab'),
+              heroTag: null,
+              onPressed: () => _showAddSlotModal(context),
+              icon: const Icon(Icons.add),
+              label: const Text(AppStrings.addSlot),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.access_time_filled_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        AppStrings.nextClassCountdown,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          countdownStr,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subject?.name ?? 'Môn học (${slot.subjectId})',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${slot.startTimeFormatted} - ${slot.endTimeFormatted} | Phòng ${slot.room}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded),
-          ],
-        ),
-      ),
     );
   }
 

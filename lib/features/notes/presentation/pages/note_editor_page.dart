@@ -11,6 +11,7 @@ import 'package:nhom_7/features/timetable/domain/repositories/timetable_reposito
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../../ai_assistant/presentation/widgets/ai_assistant_bottom_sheet.dart';
 import '../../../ocr/ocr_scanner_page.dart';
 import '../bloc/note_editor_bloc.dart';
 import '../bloc/note_editor_event.dart';
@@ -568,6 +569,40 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                       }
                     },
                   ),
+                // Nút Trợ lý AI: Tóm tắt & Sinh câu hỏi ôn tập
+                IconButton(
+                  tooltip: 'Trợ lý Học tập AI',
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  onPressed: () {
+                    final content = _bodyController.text.trim();
+                    if (content.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng nhập nội dung bài học để AI tóm tắt hoặc tạo câu hỏi.',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
+
+                    AiAssistantBottomSheet.show(
+                      context: context,
+                      noteTitle: _titleController.text.trim(),
+                      noteContent: content,
+                      subjectName: _resolvedSubjectName,
+                      onInsertToNote: (markdownText) {
+                        final current = _bodyController.text;
+                        final newContent = '$current$markdownText';
+                        _bodyController.text = newContent;
+                        context
+                            .read<NoteEditorBloc>()
+                            .add(UpdateContent(bodyText: newContent));
+                      },
+                    );
+                  },
+                ),
                 // Nút OCR: chèn chữ từ ảnh vào vị trí con trỏ (CĐ 12 / FR-14)
                 IconButton(
                   tooltip: 'Nhận diện chữ từ ảnh (OCR)',
@@ -894,6 +929,45 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                                         : 'Thêm video',
                                   ),
                                   onPressed: _pickMoreVideo,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                // Nút Trợ lý Gemini AI
+                                ActionChip(
+                                  avatar: const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 16,
+                                    color: Color(0xFF5E48E8),
+                                  ),
+                                  label: const Text('Trợ lý AI ✨'),
+                                  onPressed: () {
+                                    final content = _bodyController.text.trim();
+                                    if (content.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Vui lòng nhập nội dung bài học để AI tóm tắt hoặc tạo câu hỏi.',
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    AiAssistantBottomSheet.show(
+                                      context: context,
+                                      noteTitle: _titleController.text.trim(),
+                                      noteContent: content,
+                                      subjectName: _resolvedSubjectName,
+                                      onInsertToNote: (markdownText) {
+                                        final current = _bodyController.text;
+                                        final newContent = '$current$markdownText';
+                                        _bodyController.text = newContent;
+                                        context
+                                            .read<NoteEditorBloc>()
+                                            .add(UpdateContent(bodyText: newContent));
+                                      },
+                                    );
+                                  },
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 // Nút Vẽ tay Canvas (S07)
