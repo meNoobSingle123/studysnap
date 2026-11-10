@@ -299,18 +299,18 @@ Cảnh báo Offline, Theme Sáng/Tối, Haptic.
 6
 Tương tác media
 Duy
-video_player, chewie, image_picker
-Phát video bài giảng cục bộ (Local File từ máy, đảm bảo 100% Offline-First), Split-View, Mini-Player nổi khi mở phím, chèn mốc [mm:ss], seekTo.
+video_player
+Split-View, Mini-Player, chèn mốc thời gian [mm:ss], seekTo.
 7
 Thông báo, Quyền
 Huy
-flutter_local_notifications, permission_handler
-Nhắc lịch 15 phút, exact alarm (có fallback an toàn inexact chống crash), POST_NOTIFICATIONS trên Android 13+, khôi phục sau reboot.
+flutter_local_notifications
+Nhắc lịch 15 phút, exact alarm, khôi phục sau reboot.
 8
-Thanh toán & Deep-link
+Push / Thanh toán
 Khiêm
-url_launcher, deep-link (studysnap://)
-Tạo & tham gia Quỹ lớp qua MoMo Sandbox (backend xác thực chữ ký HMAC-SHA256 qua IPN, app nhận kết quả qua deep-link studysnap://payment).
+firebase_messaging
+FCM Topic, MoMo IPN Sandbox.
 9
 Định vị, Bản đồ
 Khiêm
