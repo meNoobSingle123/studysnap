@@ -17,10 +17,9 @@ abstract class GeminiRemoteDataSource {
 
 class GeminiRemoteDataSourceImpl implements GeminiRemoteDataSource {
   static const List<String> _flashModels = [
-    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-flash-lite-latest',
+    'gemini-2.5-flash',
   ];
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -37,10 +36,14 @@ class GeminiRemoteDataSourceImpl implements GeminiRemoteDataSource {
 
   @override
   Future<String?> getApiKey() async {
+    final savedKey = await keyStorageService.getGeminiApiKey();
+    if (savedKey != null && savedKey.trim().isNotEmpty) {
+      return savedKey.trim();
+    }
     if (_envApiKey.isNotEmpty) {
       return _envApiKey;
     }
-    return keyStorageService.getGeminiApiKey();
+    return null;
   }
 
   @override
@@ -112,6 +115,8 @@ class GeminiRemoteDataSourceImpl implements GeminiRemoteDataSource {
           headers: {
             'Content-Type': 'application/json',
           },
+          receiveTimeout: const Duration(seconds: 45),
+          sendTimeout: const Duration(seconds: 30),
         ),
       );
 
@@ -138,18 +143,23 @@ class GeminiRemoteDataSourceImpl implements GeminiRemoteDataSource {
         throw Exception('Lỗi máy chủ Google AI: ${response.statusCode}');
       }
     } on DioException catch (dioErr) {
+      if (dioErr.type == DioExceptionType.receiveTimeout ||
+          dioErr.type == DioExceptionType.sendTimeout) {
+        throw Exception(
+          'Thời gian phản hồi từ máy chủ AI quá lâu (Timeout). Vui lòng thử lại.',
+        );
+      }
       if (dioErr.type == DioExceptionType.connectionTimeout ||
-          dioErr.type == DioExceptionType.receiveTimeout ||
           dioErr.type == DioExceptionType.connectionError) {
         throw Exception(
-          'Không có kết nối Internet. Vui lòng kiểm tra lại mạng Wifi/4G để dùng Trợ lý AI.',
+          'Không thể kết nối đến máy chủ AI. Vui lòng kiểm tra lại mạng Wifi/4G.',
         );
       }
 
       final statusCode = dioErr.response?.statusCode;
       if (statusCode == 400 || statusCode == 403 || statusCode == 401) {
         throw Exception(
-          'Khóa API Key không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại key.',
+          'Khóa API Key không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra và nhập lại API Key.',
         );
       } else if (statusCode == 429) {
         throw Exception(

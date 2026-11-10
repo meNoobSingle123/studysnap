@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/l10n/strings.dart';
+import '../../../../core/security/key_storage_service.dart';
 import '../../../timetable/domain/repositories/timetable_repository.dart';
 
 import '../../domain/services/notification_service.dart';
@@ -10,10 +11,12 @@ import 'notification_state.dart';
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationService notificationService;
   final TimetableRepository timetableRepository;
+  final KeyStorageService? keyStorageService;
 
   NotificationBloc({
     required this.notificationService,
     required this.timetableRepository,
+    this.keyStorageService,
   }) : super(const NotificationInitial()) {
     on<InitNotificationEvent>(_onInit);
     on<RequestNotificationPermissionEvent>(_onRequestPermission);
@@ -33,11 +36,13 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       final isNotificationGranted = await notificationService.isNotificationPermissionGranted();
       final isExactAlarmGranted = await notificationService.isExactAlarmPermissionGranted();
       final pending = await notificationService.getPendingReminders();
+      final savedLead = await keyStorageService?.getReminderLeadMinutes() ?? 15;
 
       emit(NotificationLoaded(
         isNotificationGranted: isNotificationGranted,
         isExactAlarmGranted: isExactAlarmGranted,
         pendingCount: pending.length,
+        leadMinutes: savedLead,
       ));
     } catch (e) {
       emit(NotificationError('Lỗi khởi tạo thông báo: ${e.toString()}'));
@@ -140,12 +145,14 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     }
   }
 
-  void _onChangeLeadMinutes(
+  Future<void> _onChangeLeadMinutes(
     ChangeLeadMinutesEvent event,
     Emitter<NotificationState> emit,
-  ) {
+  ) async {
     final current = state;
     if (current is! NotificationLoaded) return;
+
+    await keyStorageService?.saveReminderLeadMinutes(event.leadMinutes);
 
     emit(current.copyWith(
       leadMinutes: event.leadMinutes,

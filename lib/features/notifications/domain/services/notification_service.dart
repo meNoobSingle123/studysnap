@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../../core/l10n/strings.dart';
 import '../../../timetable/domain/entities/subject.dart';
 import '../../../timetable/domain/entities/timetable_slot.dart';
+import '../models/scheduled_reminder.dart';
 
 /// Dịch vụ quản lý Thông báo và Nhắc giờ học tự động (Chủ đề 7).
 ///
@@ -74,6 +75,11 @@ class NotificationService {
     return status.isGranted;
   }
 
+  /// Mở cài đặt ứng dụng trên hệ điều hành khi người dùng từ chối quyền vĩnh viễn.
+  Future<bool> openDeviceSettings() async {
+    return openAppSettings();
+  }
+
   /// Kiểm tra trạng thái cấp quyền thông báo.
   Future<bool> isNotificationPermissionGranted() async {
     return Permission.notification.status.isGranted;
@@ -81,6 +87,12 @@ class NotificationService {
 
   /// Kiểm tra quyền đặt báo thức chính xác (`SCHEDULE_EXACT_ALARM` trên Android 12+).
   Future<bool> isExactAlarmPermissionGranted() async {
+    final androidPlugin = localNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      final canExact = await androidPlugin.canScheduleExactNotifications();
+      if (canExact != null) return canExact;
+    }
     return Permission.scheduleExactAlarm.status.isGranted;
   }
 
@@ -168,15 +180,28 @@ class NotificationService {
           );
           const notificationDetails = NotificationDetails(android: androidDetails);
 
-          await localNotificationsPlugin.zonedSchedule(
-            id: reminderId,
-            title: 'Sắp đến ca học: $subjectName',
-            body: 'Bắt đầu lúc ${slot.startTimeFormatted} tại Phòng ${slot.room}${slot.buildingId != null ? ' (Tòa ${slot.buildingId})' : ''}',
-            scheduledDate: tzScheduledTime,
-            notificationDetails: notificationDetails,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            payload: 'studysnap://slot?id=${slot.id}',
-          );
+          try {
+            await localNotificationsPlugin.zonedSchedule(
+              id: reminderId,
+              title: 'Sắp đến ca học: $subjectName',
+              body: 'Bắt đầu lúc ${slot.startTimeFormatted} tại Phòng ${slot.room}${slot.buildingId != null ? ' (Tòa ${slot.buildingId})' : ''}',
+              scheduledDate: tzScheduledTime,
+              notificationDetails: notificationDetails,
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              payload: 'studysnap://slot?id=${slot.id}',
+            );
+          } catch (_) {
+            // Fallback sang inexact nếu thiết bị không có quyền exact alarm (Android 12+ / 13+)
+            await localNotificationsPlugin.zonedSchedule(
+              id: reminderId,
+              title: 'Sắp đến ca học: $subjectName',
+              body: 'Bắt đầu lúc ${slot.startTimeFormatted} tại Phòng ${slot.room}${slot.buildingId != null ? ' (Tòa ${slot.buildingId})' : ''}',
+              scheduledDate: tzScheduledTime,
+              notificationDetails: notificationDetails,
+              androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+              payload: 'studysnap://slot?id=${slot.id}',
+            );
+          }
 
           scheduledCount++;
           if (scheduledCount >= maxRemindersQuota) break;
@@ -201,5 +226,17 @@ class NotificationService {
   /// Lấy danh sách các thông báo đang chờ phát.
   Future<List<PendingNotificationRequest>> getPendingReminders() async {
     return localNotificationsPlugin.pendingNotificationRequests();
+  }
+
+  /// Lấy danh sách thông báo đã lên lịch dưới dạng Domain Model [ScheduledReminder].
+  Future<List<ScheduledReminder>> getScheduledReminders() async {
+    final pending = await getPendingReminders();
+    return pending.map((p) => ScheduledReminder(
+      id: p.id,
+      title: p.title ?? '',
+      body: p.body ?? '',
+      scheduledTime: DateTime.now(),
+      payload: p.payload,
+    )).toList();
   }
 }

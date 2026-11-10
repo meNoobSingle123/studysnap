@@ -253,44 +253,6 @@ class _NotificationSettingsView extends StatelessWidget {
                   context.read<NotificationBloc>().add(const TriggerTestNotificationEvent());
                 },
               ),
-
-              const SizedBox(height: 24),
-
-              // 5. Ghi chú kiến thức bảo vệ đồ án
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded, size: 16, color: theme.colorScheme.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Cơ chế hoạt động CĐ 7 (Chống rớt thông báo):',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '• Sử dụng Exact Alarm (exactAllowWhileIdle) để đánh thức máy ở chế độ tiết kiệm pin (Doze mode).\n'
-                      '• Áp dụng thuật toán cuốn chiếu 7 ngày tới, khống chế ≤ 60 thông báo để không tràn quota OS.\n'
-                      '• Tích hợp Receiver BOOT_COMPLETED giúp tự động phục hồi lịch nhắc sau khi khởi động lại máy.',
-                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
             ],
           );
         },

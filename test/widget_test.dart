@@ -77,9 +77,10 @@ void main() {
     await tester.tap(find.text(AppStrings.createNote));
     await tester.pumpAndSettle();
 
-    // Verify S06 NoteEditorPage is displayed
+    // Verify S06 NoteEditorPage is displayed with bottom toolbar items
     expect(find.text(AppStrings.noteEditorTitle), findsOneWidget);
-    expect(find.text(AppStrings.save), findsOneWidget);
+    expect(find.text('Trợ lý học tập'), findsOneWidget);
+    expect(find.text('Nhận diện chữ'), findsOneWidget);
   });
 }
 

@@ -13,6 +13,11 @@ class KeyStorageService {
   static const String kAppLockEnabledKey = 'is_app_lock_enabled';
   static const String kGeminiApiKeyName = 'gemini_api_key_v1';
   static const String kOnboardingCompletedKey = 'is_onboarding_completed_v1';
+  static const String kAppLockPinKey = 'app_lock_pin_v1';
+  static const String kFailedPinAttemptsKey = 'failed_pin_attempts_v1';
+  static const String kPinLockoutUntilKey = 'pin_lockout_until_v1';
+  static const String kReminderLeadMinutesKey = 'reminder_lead_minutes_v1';
+  static const String kReminderEnabledKey = 'reminder_enabled_v1';
 
   final FlutterSecureStorage _storage;
 
@@ -134,5 +139,147 @@ class KeyStorageService {
   /// Xóa khóa mã hóa khỏi secure storage.
   Future<void> clearEncryptionKey() async {
     await _storage.delete(key: kDbEncryptionKeyName);
+  }
+
+  /// Lấy mã PIN đã cài đặt (nếu có).
+  Future<String?> getPin() async {
+    try {
+      return await _storage.read(key: kAppLockPinKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Cài đặt mã PIN mới.
+  Future<void> setPin(String pin) async {
+    try {
+      await _storage.write(key: kAppLockPinKey, value: pin.trim());
+    } catch (_) {}
+  }
+
+  /// Kiểm tra xem người dùng đã thiết lập mã PIN chưa.
+  Future<bool> hasPin() async {
+    try {
+      final pin = await _storage.read(key: kAppLockPinKey);
+      return pin != null && pin.trim().isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Xóa mã PIN.
+  Future<void> clearPin() async {
+    try {
+      await _storage.delete(key: kAppLockPinKey);
+    } catch (_) {}
+  }
+
+  /// Lấy số lần nhập sai PIN hiện tại.
+  Future<int> getFailedPinAttempts() async {
+    try {
+      final val = await _storage.read(key: kFailedPinAttemptsKey);
+      return val != null ? int.tryParse(val) ?? 0 : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Tăng số lần nhập sai PIN lên 1.
+  Future<int> incrementFailedPinAttempts() async {
+    final current = await getFailedPinAttempts();
+    final next = current + 1;
+    try {
+      await _storage.write(key: kFailedPinAttemptsKey, value: next.toString());
+    } catch (_) {}
+    return next;
+  }
+
+  /// Đặt lại số lần nhập sai PIN về 0.
+  Future<void> resetFailedPinAttempts() async {
+    try {
+      await _storage.delete(key: kFailedPinAttemptsKey);
+    } catch (_) {}
+  }
+
+  /// Lấy thời điểm kết thúc khóa tạm (lockout).
+  Future<DateTime?> getLockoutUntil() async {
+    try {
+      final val = await _storage.read(key: kPinLockoutUntilKey);
+      if (val != null) {
+        final ms = int.tryParse(val);
+        if (ms != null) {
+          final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+          if (dt.isAfter(DateTime.now())) {
+            return dt;
+          }
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Đặt thời điểm kết thúc khóa tạm (lockout).
+  Future<void> setLockoutUntil(DateTime until) async {
+    try {
+      await _storage.write(
+        key: kPinLockoutUntilKey,
+        value: until.millisecondsSinceEpoch.toString(),
+      );
+    } catch (_) {}
+  }
+
+  /// Xóa trạng thái khóa tạm.
+  Future<void> clearLockout() async {
+    try {
+      await _storage.delete(key: kPinLockoutUntilKey);
+    } catch (_) {}
+  }
+
+  /// Lấy số phút nhắc trước ca học (mặc định 15 phút).
+  Future<int> getReminderLeadMinutes() async {
+    try {
+      final val = await _storage.read(key: kReminderLeadMinutesKey);
+      if (val != null) {
+        final mins = int.tryParse(val);
+        if (mins != null && [5, 10, 15, 30].contains(mins)) {
+          return mins;
+        }
+      }
+      return 15;
+    } catch (_) {
+      return 15;
+    }
+  }
+
+  /// Lưu số phút nhắc trước ca học.
+  Future<void> saveReminderLeadMinutes(int minutes) async {
+    try {
+      await _storage.write(
+        key: kReminderLeadMinutesKey,
+        value: minutes.toString(),
+      );
+    } catch (_) {}
+  }
+
+  /// Lấy trạng thái bật/tắt nhắc nhở (mặc định true).
+  Future<bool> getReminderEnabled() async {
+    try {
+      final val = await _storage.read(key: kReminderEnabledKey);
+      return val != 'false';
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Lưu trạng thái bật/tắt nhắc nhở.
+  Future<void> saveReminderEnabled(bool enabled) async {
+    try {
+      await _storage.write(
+        key: kReminderEnabledKey,
+        value: enabled.toString(),
+      );
+    } catch (_) {}
   }
 }

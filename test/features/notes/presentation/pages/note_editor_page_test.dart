@@ -125,7 +125,7 @@ void main() {
       expect(find.textContaining('[00:00]'), findsWidgets);
     });
 
-    testWidgets('tapping save button saves note with updated title and body into repository',
+    testWidgets('editing note triggers auto-save with updated title and body into repository',
         (tester) async {
       await tester.pumpWidget(buildTestHarness(noteId: 'test-note-save'));
       await tester.pumpAndSettle();
@@ -135,8 +135,8 @@ void main() {
       await tester.enterText(find.byType(TextField).last, 'Ghi chu noi dung');
       await tester.pump();
 
-      // Tap Save
-      await tester.tap(find.byIcon(Icons.save_outlined));
+      // Wait for debounce auto-save (2 seconds)
+      await tester.pump(const Duration(seconds: 3));
       await tester.pumpAndSettle();
 
       final savedNote = await repository.getNoteById('test-note-save');

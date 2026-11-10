@@ -303,5 +303,29 @@ void main() {
         ),
       );
     });
+
+    test('SubjectsStreamUpdated dynamically updates subjectsMap in state', () async {
+      final newSubject = Subject(
+        id: 'sub_new',
+        code: 'NEW101',
+        name: 'Trí tuệ nhân tạo nâng cao',
+        credits: 3,
+        colorArgb: 0xFFFF5722,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      bloc.add(SubjectsStreamUpdated([subject1, subject2, newSubject]));
+
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) {
+            return state.subjectsMap.containsKey('sub_new') &&
+                state.subjectsMap['sub_new']?.name == 'Trí tuệ nhân tạo nâng cao';
+          }),
+        ),
+      );
+    });
   });
 }

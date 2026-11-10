@@ -132,5 +132,52 @@ void main() {
             value: 'false',
           )).called(1);
     });
+
+    test('getPin, setPin, hasPin, clearPin work correctly', () async {
+      when(() => mockStorage.read(key: KeyStorageService.kAppLockPinKey))
+          .thenAnswer((_) async => null);
+      expect(await keyStorageService.hasPin(), isFalse);
+      expect(await keyStorageService.getPin(), isNull);
+
+      when(() => mockStorage.write(
+            key: KeyStorageService.kAppLockPinKey,
+            value: '1234',
+          )).thenAnswer((_) async {});
+      await keyStorageService.setPin('1234');
+      verify(() => mockStorage.write(
+            key: KeyStorageService.kAppLockPinKey,
+            value: '1234',
+          )).called(1);
+
+      when(() => mockStorage.read(key: KeyStorageService.kAppLockPinKey))
+          .thenAnswer((_) async => '1234');
+      expect(await keyStorageService.hasPin(), isTrue);
+      expect(await keyStorageService.getPin(), equals('1234'));
+
+      when(() => mockStorage.delete(key: KeyStorageService.kAppLockPinKey))
+          .thenAnswer((_) async {});
+      await keyStorageService.clearPin();
+      verify(() => mockStorage.delete(key: KeyStorageService.kAppLockPinKey))
+          .called(1);
+    });
+
+    test('failed PIN attempts increment, get and reset', () async {
+      when(() => mockStorage.read(key: KeyStorageService.kFailedPinAttemptsKey))
+          .thenAnswer((_) async => null);
+      expect(await keyStorageService.getFailedPinAttempts(), equals(0));
+
+      when(() => mockStorage.write(
+            key: KeyStorageService.kFailedPinAttemptsKey,
+            value: '1',
+          )).thenAnswer((_) async {});
+      final next = await keyStorageService.incrementFailedPinAttempts();
+      expect(next, equals(1));
+
+      when(() => mockStorage.delete(key: KeyStorageService.kFailedPinAttemptsKey))
+          .thenAnswer((_) async {});
+      await keyStorageService.resetFailedPinAttempts();
+      verify(() => mockStorage.delete(key: KeyStorageService.kFailedPinAttemptsKey))
+          .called(1);
+    });
   });
 }

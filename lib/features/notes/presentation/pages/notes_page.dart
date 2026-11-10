@@ -76,7 +76,7 @@ class _NotesPageState extends State<NotesPage> {
 
     return BlocProvider(
       create: (_) => getIt<NoteListBloc>()..add(const LoadNotesStarted()),
-      child: const _HuyNotesView(),
+      child: const _NoteListView(),
     );
   }
 
@@ -91,8 +91,42 @@ class _NotesPageState extends State<NotesPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _notes.isEmpty
-              ? const Center(
-                  child: Text(AppStrings.emptyNotesList),
+              ? Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.note_alt_outlined,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          AppStrings.emptyNotesList,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Bắt đầu buổi học với một ghi chú mới hoặc chụp slide bài giảng',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: () => context.push(Routes.noteEditor),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Tạo ghi chú mới'),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: _loadNotes,
@@ -237,15 +271,15 @@ class _NotesPageState extends State<NotesPage> {
   }
 }
 
-class _HuyNotesView extends StatefulWidget {
+class _NoteListView extends StatefulWidget {
 
-  const _HuyNotesView();
+  const _NoteListView();
 
   @override
-  State<_HuyNotesView> createState() => _HuyNotesViewState();
+  State<_NoteListView> createState() => _NoteListViewState();
 }
 
-class _HuyNotesViewState extends State<_HuyNotesView> {
+class _NoteListViewState extends State<_NoteListView> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -650,6 +684,28 @@ class _HuyNotesViewState extends State<_HuyNotesView> {
                             ),
                             textAlign: TextAlign.center,
                           ),
+                          if (!isFiltering) ...[
+                            const SizedBox(height: 20),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                FilledButton.icon(
+                                  key: const ValueKey('empty_create_note_btn'),
+                                  onPressed: () => context.push(Routes.noteEditor),
+                                  icon: const Icon(Icons.add_rounded, size: 18),
+                                  label: const Text('Tạo ghi chú mới'),
+                                ),
+                                OutlinedButton.icon(
+                                  key: const ValueKey('empty_scan_slide_btn'),
+                                  onPressed: () => context.push(Routes.scanner),
+                                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                                  label: const Text('Chụp slide bài học'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),

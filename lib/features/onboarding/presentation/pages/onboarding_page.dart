@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/router/routes.dart';
@@ -18,6 +19,69 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isNotificationGranted = false;
+  bool _isCameraGranted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialPermissions();
+  }
+
+  Future<void> _checkInitialPermissions() async {
+    try {
+      final notif = await Permission.notification.isGranted;
+      final cam = await Permission.camera.isGranted;
+      if (mounted) {
+        setState(() {
+          _isNotificationGranted = notif;
+          _isCameraGranted = cam;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _requestNotification() async {
+    try {
+      final status = await Permission.notification.request();
+      if (mounted) {
+        setState(() {
+          _isNotificationGranted = status.isGranted;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status.isGranted
+                  ? 'Đã bật thông báo nhắc ca học thành công!'
+                  : 'Chưa cấp quyền thông báo. Bạn có thể bật lại trong Cài đặt.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _requestCamera() async {
+    try {
+      final status = await Permission.camera.request();
+      if (mounted) {
+        setState(() {
+          _isCameraGranted = status.isGranted;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status.isGranted
+                  ? 'Đã cấp quyền Máy ảnh thành công!'
+                  : 'Chưa cấp quyền máy ảnh. Bạn có thể bật lại trong Cài đặt.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
   KeyStorageService get _keyStorage {
     return widget.keyStorageService ??
@@ -200,6 +264,56 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               );
                             }).toList(),
                           ),
+
+                          // Nút xin quyền đúng ngữ cảnh (Contextual Permissions)
+                          if (index == 0) ...[
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _isNotificationGranted
+                                  ? null
+                                  : _requestNotification,
+                              icon: Icon(
+                                _isNotificationGranted
+                                    ? Icons.check_circle_rounded
+                                    : Icons.notifications_active_outlined,
+                                size: 18,
+                                color: _isNotificationGranted ? Colors.teal : null,
+                              ),
+                              label: Text(
+                                _isNotificationGranted
+                                    ? 'Đã bật thông báo ca học ✓'
+                                    : 'Cho phép thông báo nhắc học',
+                              ),
+                            ),
+                          ] else if (index == 1) ...[
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed:
+                                  _isCameraGranted ? null : _requestCamera,
+                              icon: Icon(
+                                _isCameraGranted
+                                    ? Icons.check_circle_rounded
+                                    : Icons.camera_alt_outlined,
+                                size: 18,
+                                color: _isCameraGranted ? Colors.teal : null,
+                              ),
+                              label: Text(
+                                _isCameraGranted
+                                    ? 'Đã cấp quyền Máy ảnh ✓'
+                                    : 'Cho phép máy ảnh chụp slide',
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

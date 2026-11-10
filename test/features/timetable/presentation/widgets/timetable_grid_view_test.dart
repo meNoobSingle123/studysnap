@@ -64,7 +64,7 @@ void main() {
       expect(find.byIcon(Icons.add_rounded), findsWidgets);
     });
 
-    testWidgets('tapping time cell opens popup menu with Insert Row and Delete Row', (tester) async {
+    testWidgets('tapping time cell opens popup menu with Chèn thêm hàng and Xóa hàng này', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -75,8 +75,8 @@ void main() {
       await tester.tap(popupFinder);
       await tester.pumpAndSettle();
 
-      expect(find.text('Insert Row'), findsOneWidget);
-      expect(find.text('Delete Row'), findsOneWidget);
+      expect(find.text('Chèn thêm hàng'), findsOneWidget);
+      expect(find.text('Xóa hàng này'), findsOneWidget);
     });
   });
 }

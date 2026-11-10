@@ -105,4 +105,76 @@ void main() {
     expect(find.text('Lập trình di động Flutter'), findsWidgets);
     expect(find.text('A1.401'), findsOneWidget);
   });
+
+  testWidgets('SlotDetailPage renders deadlines card and allows adding deadline',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SlotDetailPage(slotId: 'test_slot_101'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Deadline Card exists
+    expect(find.textContaining('Hạn nộp & Nhiệm vụ'), findsOneWidget);
+    final addButton = find.text('Thêm');
+    expect(addButton, findsOneWidget);
+
+    // Scroll until visible then tap
+    await tester.ensureVisible(addButton);
+    await tester.pumpAndSettle();
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    // Verify Add Deadline modal opens
+    expect(find.text('Thêm hạn nộp bài / Nhiệm vụ'), findsOneWidget);
+    expect(find.text('Tên bài tập / nhiệm vụ *'), findsOneWidget);
+
+    // Enter title
+    await tester.enterText(find.byType(TextField).first, 'Bài tập lớn cuối kỳ');
+    await tester.pumpAndSettle();
+
+    // Tap 'Thêm nhiệm vụ' button
+    await tester.tap(find.text('Thêm nhiệm vụ'));
+    await tester.pumpAndSettle();
+
+    // Verify new deadline is displayed in list
+    expect(find.text('Bài tập lớn cuối kỳ'), findsOneWidget);
+  });
+
+  testWidgets('SlotDetailPage persists reminder minutes when 5 mins is selected',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SlotDetailPage(slotId: 'test_slot_101'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final fiveMinsChip = find.text('5 phút');
+    expect(fiveMinsChip, findsOneWidget);
+
+    await tester.ensureVisible(fiveMinsChip);
+    await tester.pumpAndSettle();
+    await tester.tap(fiveMinsChip);
+    await tester.pumpAndSettle();
+
+    // Verify storage has '5'
+    const storage = FlutterSecureStorage();
+    final savedMins = await storage.read(key: 'slot_reminder_mins_test_slot_101');
+    expect(savedMins, '5');
+
+    // Reopen SlotDetailPage to verify persistence
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SlotDetailPage(slotId: 'test_slot_101'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final choiceChipWidget = tester.widget<ChoiceChip>(
+      find.ancestor(of: find.text('5 phút'), matching: find.byType(ChoiceChip)),
+    );
+    expect(choiceChipWidget.selected, isTrue);
+  });
 }

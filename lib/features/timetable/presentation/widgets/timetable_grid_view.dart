@@ -153,7 +153,7 @@ class _TimetableGridViewState extends State<TimetableGridView> {
     final pickedStart = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: defaultStartH % 24, minute: defaultStartM),
-      helpText: 'Chọn giờ bắt đầu hàng mới (Insert Row)',
+      helpText: 'Chọn giờ bắt đầu hàng mới',
     );
     if (pickedStart == null || !mounted) return;
 
@@ -414,8 +414,8 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                           child: TextField(
                             controller: buildingCtrl,
                             decoration: InputDecoration(
-                              labelText: 'Tòa nhà',
-                              hintText: 'VD: Tòa A',
+                              labelText: 'Địa điểm',
+                              hintText: 'VD: Cơ sở 1, Tòa A...',
                               prefixIcon: const Icon(Icons.business_outlined),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -747,7 +747,7 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                                 Icon(Icons.add_circle_outline, color: Color(0xFF5E48E8), size: 19),
                                 SizedBox(width: 10),
                                 Text(
-                                  'Insert Row',
+                                  'Chèn thêm hàng',
                                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                                 ),
                               ],
@@ -761,7 +761,7 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                                 Icon(Icons.delete_outline, color: Colors.red, size: 19),
                                 SizedBox(width: 10),
                                 Text(
-                                  'Delete Row',
+                                  'Xóa hàng này',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13.5,
@@ -1044,7 +1044,7 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Chạm ô để nhập môn • Chạm cột Giờ để Chèn & Xóa hàng',
+                          'Chạm ô để nhập môn • Chạm cột Giờ để Thêm/Xóa/Sửa khung giờ',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 11,

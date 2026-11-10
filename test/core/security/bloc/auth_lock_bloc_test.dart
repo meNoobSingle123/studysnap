@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:nhom_7/core/l10n/strings.dart';
+import 'package:nhom_7/core/security/key_storage_service.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_bloc.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_event.dart';
 import 'package:nhom_7/core/security/bloc/auth_lock_state.dart';
 
 class MockLocalAuthentication extends Mock implements LocalAuthentication {}
+class MockKeyStorageService extends Mock implements KeyStorageService {}
 
 void main() {
   late MockLocalAuthentication mockLocalAuth;
@@ -170,6 +172,57 @@ void main() {
         bloc.add(AppResumed(timestamp: resumeTime));
       },
       expect: () => [],
+    );
+
+    blocTest<AuthLockBloc, AuthLockState>(
+      'SubmitPin emits [AuthUnlocked] when PIN matches',
+      build: () {
+        final mockStorage = MockKeyStorageService();
+        when(() => mockStorage.getLockoutUntil()).thenAnswer((_) async => null);
+        when(() => mockStorage.getPin()).thenAnswer((_) async => '1234');
+        when(() => mockStorage.resetFailedPinAttempts()).thenAnswer((_) async {});
+        when(() => mockStorage.clearLockout()).thenAnswer((_) async {});
+        return AuthLockBloc(localAuth: mockLocalAuth, keyStorage: mockStorage);
+      },
+      act: (bloc) => bloc.add(const SubmitPin('1234')),
+      expect: () => [
+        const AuthUnlocked(),
+      ],
+    );
+
+    blocTest<AuthLockBloc, AuthLockState>(
+      'SubmitPin emits [AuthLocked] with error when PIN is incorrect and attempts < 5',
+      build: () {
+        final mockStorage = MockKeyStorageService();
+        when(() => mockStorage.getLockoutUntil()).thenAnswer((_) async => null);
+        when(() => mockStorage.getPin()).thenAnswer((_) async => '1234');
+        when(() => mockStorage.incrementFailedPinAttempts())
+            .thenAnswer((_) async => 1);
+        return AuthLockBloc(localAuth: mockLocalAuth, keyStorage: mockStorage);
+      },
+      act: (bloc) => bloc.add(const SubmitPin('9999')),
+      expect: () => [
+        const AuthLocked(
+          isPinMode: true,
+          errorMessage: 'Mã PIN không đúng. Bạn còn 4 lần thử.',
+          failedAttempts: 1,
+        ),
+      ],
+    );
+
+    blocTest<AuthLockBloc, AuthLockState>(
+      'SetupPin stores new PIN and emits [AuthUnlocked]',
+      build: () {
+        final mockStorage = MockKeyStorageService();
+        when(() => mockStorage.setPin('5678')).thenAnswer((_) async {});
+        when(() => mockStorage.resetFailedPinAttempts()).thenAnswer((_) async {});
+        when(() => mockStorage.clearLockout()).thenAnswer((_) async {});
+        return AuthLockBloc(localAuth: mockLocalAuth, keyStorage: mockStorage);
+      },
+      act: (bloc) => bloc.add(const SetupPin('5678')),
+      expect: () => [
+        const AuthUnlocked(),
+      ],
     );
   });
 }

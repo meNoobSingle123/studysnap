@@ -12,11 +12,17 @@ class LoadNote extends NoteEditorEvent {
   final String id;
   final String? subjectId;
   final String? slotId;
+  final List<String>? initialImagePaths;
 
-  const LoadNote(this.id, {this.subjectId, this.slotId});
+  const LoadNote(
+    this.id, {
+    this.subjectId,
+    this.slotId,
+    this.initialImagePaths,
+  });
 
   @override
-  List<Object?> get props => [id, subjectId, slotId];
+  List<Object?> get props => [id, subjectId, slotId, initialImagePaths];
 }
 
 /// Updates title or body text in the current note draft.

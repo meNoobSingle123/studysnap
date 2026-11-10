@@ -17,6 +17,7 @@ class AiAssistantBloc extends Bloc<AiAssistantEvent, AiAssistantState> {
     required this.repository,
   }) : super(const AiAssistantInitial()) {
     on<CheckApiKeyStatus>(_onCheckApiKey);
+    on<ConfigureApiKeyRequested>(_onConfigureApiKey);
     on<SaveApiKeyRequested>(_onSaveApiKey);
     on<SummarizeNoteRequested>(_onSummarizeNote);
     on<GenerateQuizRequested>(_onGenerateQuiz);
@@ -30,6 +31,19 @@ class AiAssistantBloc extends Bloc<AiAssistantEvent, AiAssistantState> {
   ) async {
     final hasKey = await repository.hasApiKey();
     if (!hasKey) {
+      final key = await repository.getApiKey();
+      emit(AiAssistantNeedsApiKey(existingKey: key));
+    }
+  }
+
+  Future<void> _onConfigureApiKey(
+    ConfigureApiKeyRequested event,
+    Emitter<AiAssistantState> emit,
+  ) async {
+    if (event.clearExisting) {
+      await repository.saveApiKey('');
+      emit(const AiAssistantNeedsApiKey());
+    } else {
       final key = await repository.getApiKey();
       emit(AiAssistantNeedsApiKey(existingKey: key));
     }

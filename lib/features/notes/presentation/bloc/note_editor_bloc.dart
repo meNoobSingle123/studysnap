@@ -40,19 +40,42 @@ class NoteEditorBloc extends Bloc<NoteEditorEvent, NoteEditorState> {
       if (emit.isDone) return;
 
       if (existing != null) {
-        emit(NoteEditorLoaded(note: existing));
+        if (event.initialImagePaths != null && event.initialImagePaths!.isNotEmpty) {
+          final merged = List<String>.from(existing.imagePaths);
+          for (final p in event.initialImagePaths!) {
+            if (!merged.contains(p)) merged.add(p);
+          }
+          final updated = existing.copyWith(
+            imagePaths: merged,
+            updatedAt: DateTime.now(),
+          );
+          emit(NoteEditorLoaded(note: updated, hasUnsavedChanges: true));
+          _triggerDebouncedSave();
+        } else {
+          emit(NoteEditorLoaded(note: existing));
+        }
       } else {
         final now = DateTime.now();
+        final initialImages = event.initialImagePaths != null
+            ? List<String>.from(event.initialImagePaths!)
+            : <String>[];
         final newDraft = LectureNote(
           id: event.id,
           subjectId: event.subjectId ?? 'general',
           slotId: event.slotId,
           title: '',
           bodyText: '',
+          imagePaths: initialImages,
           createdAt: now,
           updatedAt: now,
         );
-        emit(NoteEditorLoaded(note: newDraft));
+        emit(NoteEditorLoaded(
+          note: newDraft,
+          hasUnsavedChanges: initialImages.isNotEmpty,
+        ));
+        if (initialImages.isNotEmpty) {
+          _triggerDebouncedSave();
+        }
       }
     } catch (e) {
       if (!emit.isDone) {

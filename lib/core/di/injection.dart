@@ -202,6 +202,7 @@ Future<void> configureDependencies({bool isTest = false}) async {
     () => NotificationBloc(
       notificationService: getIt<NotificationService>(),
       timetableRepository: getIt<TimetableRepository>(),
+      keyStorageService: getIt<KeyStorageService>(),
     ),
   );
 

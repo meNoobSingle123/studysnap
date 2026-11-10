@@ -324,7 +324,7 @@ class _ToolsPageState extends State<ToolsPage> {
             ),
           ),
 
-          // ── 2. Nhóm Tiện ích Học tập hàng đầu (Cards 2x2) ───────────────────
+          // ── 2. Nhóm Tiện ích Học tập hàng đầu (Cards 3x2) ───────────────────
           _buildSectionHeader(context, AppStrings.sectionStudy, Icons.apps_rounded),
           Row(
             children: [
@@ -332,10 +332,9 @@ class _ToolsPageState extends State<ToolsPage> {
                 child: _buildToolGridCard(
                   context: context,
                   title: AppStrings.gpaProjectionTitle,
-                  subtitle: 'Tính điểm GPA cần đạt cho mục tiêu',
+                  subtitle: 'Tính điểm mục tiêu & bảng điểm môn học',
                   icon: Icons.calculate_rounded,
                   iconColor: const Color(0xFF1E88E5),
-                  badge: 'CĐ 2',
                   onTap: () => context.push(Routes.gpaProjection),
                 ),
               ),
@@ -347,7 +346,6 @@ class _ToolsPageState extends State<ToolsPage> {
                   subtitle: 'Xuất lịch học & ghi chú A4 Unicode',
                   icon: Icons.picture_as_pdf_rounded,
                   iconColor: const Color(0xFFE53935),
-                  badge: 'CĐ 4',
                   onTap: () => context.push(Routes.pdfExport),
                 ),
               ),
@@ -363,7 +361,6 @@ class _ToolsPageState extends State<ToolsPage> {
                   subtitle: AppStrings.ocrScannerSubtitle,
                   icon: Icons.document_scanner_rounded,
                   iconColor: const Color(0xFF43A047),
-                  badge: 'CĐ 12',
                   onTap: () => context.push(Routes.ocrScanner),
                 ),
               ),
@@ -376,6 +373,32 @@ class _ToolsPageState extends State<ToolsPage> {
                   icon: Icons.camera_enhance_rounded,
                   iconColor: const Color(0xFFFB8C00),
                   onTap: () => context.push(Routes.scanner),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildToolGridCard(
+                  context: context,
+                  title: 'Bảng vẽ phác thảo',
+                  subtitle: 'Vẽ tự do, dạ quang, tẩy & bảng màu',
+                  icon: Icons.draw_rounded,
+                  iconColor: const Color(0xFF8E24AA),
+                  onTap: () => context.push(Routes.canvas),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildToolGridCard(
+                  context: context,
+                  title: 'Xem giới thiệu',
+                  subtitle: 'Tổng quan các tính năng StudySnap',
+                  icon: Icons.explore_rounded,
+                  iconColor: const Color(0xFF00897B),
+                  onTap: () => context.push(Routes.onboarding),
                 ),
               ),
             ],
@@ -461,16 +484,16 @@ class _ToolsPageState extends State<ToolsPage> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.indigo.withValues(alpha: 0.1),
+                      color: Colors.blueGrey.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.explore_outlined, color: Colors.indigo, size: 20),
+                    child: const Icon(Icons.settings_suggest_rounded, color: Colors.blueGrey, size: 20),
                   ),
-                  title: const Text('Giới thiệu & Chào mừng (Onboarding)'),
-                  subtitle: const Text('Xem lại tổng quan các tính năng của StudySnap'),
+                  title: const Text(AppStrings.appSettings),
+                  subtitle: const Text('Cấu hình AI Gemini, bộ nhớ đệm, bảo mật và ứng dụng'),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push(Routes.onboarding),
+                  onTap: () => context.push(Routes.systemSettings),
                 ),
                 Divider(
                   indent: 68,
@@ -493,115 +516,11 @@ class _ToolsPageState extends State<ToolsPage> {
                   trailing: const Icon(Icons.chevron_right, size: 20),
                   onTap: () => context.push(Routes.notifications),
                 ),
-                Divider(
-                  indent: 68,
-                  height: 1,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.25),
-                ),
-                ListTile(
-                  leading: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: Colors.blueGrey.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.info_outline_rounded, color: Colors.blueGrey, size: 20),
-                  ),
-                  title: const Text(AppStrings.appSettings),
-                  subtitle: const Text('StudySnap v1.1.0 (Bản dựng 2) • Xem nhật ký cập nhật'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () {
-                    showDialog<void>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        title: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(Icons.update_rounded, color: colorScheme.primary, size: 22),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('StudySnap', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  Text('Phiên bản v1.1.0 • Build 2', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        content: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '🚀 Điểm mới trong bản cập nhật v1.1.0:',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text('• 🗓️ Thời khóa biểu ma trận: Thao tác Chèn hàng (Insert Row), Xóa hàng (Delete Row), Sửa khung giờ trực tiếp tại từng ca học.'),
-                                    SizedBox(height: 6),
-                                    Text('• 🤖 Trợ lý Học tập AI (Gemini Flash ngầm): Nạp nhiều ảnh Slide bài giảng tự động quét OCR offline; tạo câu hỏi trắc nghiệm tùy chọn số lượng (3, 5, 10 câu) và độ khó (Dễ, Trung bình, Khó).'),
-                                    SizedBox(height: 6),
-                                    Text('• 📊 Bộ công cụ học đường: Tối ưu tính GPA tích lũy, Quét bảng viết OCR không cần mạng, Xuất file PDF A4 chuẩn tiếng Việt.'),
-                                    SizedBox(height: 6),
-                                    Text('• 📖 Giới thiệu & Onboarding: Dễ dàng xem lại trang giới thiệu và hướng dẫn tính năng bất cứ lúc nào.'),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                '© 2026 Nhóm 7 • Clean Architecture • Local-First Hive CE AES-256',
-                                style: TextStyle(fontSize: 11, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Đóng'),
-                          ),
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            icon: const Icon(Icons.explore_outlined, size: 16),
-                            label: const Text('Xem giới thiệu'),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              context.push(Routes.onboarding);
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
               ],
             ),
           ),
 
-          // ── 5. Nhóm Bảo mật (CĐ 11) ──────────────────────────────────────
+          // ── 5. Nhóm Bảo mật ──────────────────────────────────────
           _buildSectionHeader(context, AppStrings.sectionSecurity, Icons.security_rounded),
           Card(
             elevation: 0,
@@ -610,51 +529,24 @@ class _ToolsPageState extends State<ToolsPage> {
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
             ),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  secondary: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.fingerprint, color: colorScheme.primary, size: 22),
-                  ),
-                  title: const Text(
-                    AppStrings.biometricLockTitle,
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(AppStrings.biometricLockSubtitle),
-                  value: _isLockEnabled,
-                  onChanged: _onToggleLock,
+            child: SwitchListTile(
+              secondary: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                Divider(
-                  indent: 68,
-                  height: 1,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.25),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.lock_outline_rounded, size: 16, color: colorScheme.outline),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Dữ liệu mã hóa AES-256 lưu hoàn toàn trên thiết bị (Local-First).',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.outline,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                alignment: Alignment.center,
+                child: Icon(Icons.fingerprint, color: colorScheme.primary, size: 22),
+              ),
+              title: const Text(
+                AppStrings.biometricLockTitle,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text(AppStrings.biometricLockSubtitle),
+              value: _isLockEnabled,
+              onChanged: _onToggleLock,
             ),
           ),
         ],

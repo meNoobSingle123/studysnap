@@ -9,7 +9,6 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
-import '../../data/datasources/timetable_local_datasource.dart';
 import '../../data/datasources/timetable_remote_data_source.dart';
 import '../../domain/entities/subject.dart';
 import '../../domain/entities/timetable_slot.dart';
@@ -129,7 +128,7 @@ class _TimetablePageState extends State<TimetablePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Ứng dụng đang chạy Ngoại tuyến (Local-First). Không kết nối được tới máy chủ trường học (Port 3000). Đã làm mới dữ liệu từ máy.',
+            'Ứng dụng đang chạy Ngoại tuyến (Local-First). Đã làm mới dữ liệu từ máy.',
           ),
           backgroundColor: Colors.blueGrey,
           duration: Duration(seconds: 4),
@@ -304,61 +303,6 @@ class _TimetableViewState extends State<_TimetableView> {
     }
   }
 
-  Future<void> _clearSystemSlots(BuildContext blocContext) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final repo = getIt<TimetableRepository>();
-      final slots = await repo.watchAllSlots().first;
-      final systemSlots = slots.where((s) => s.isSystem).toList();
-      for (final s in systemSlots) {
-        await repo.deleteSlot(s.id);
-      }
-      if (!mounted) return;
-      if (blocContext.mounted) {
-        blocContext.read<TimetableBloc>().add(DaySelectedEvent(_focusedDay));
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Đã xóa ${systemSlots.length} ca học mẫu. Lịch hiện chỉ hiển thị ca học do bạn tự tạo!',
-          ),
-          backgroundColor: Colors.blueAccent,
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Lỗi khi xóa ca học mẫu: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _restoreMockData(BuildContext blocContext) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      if (getIt.isRegistered<TimetableLocalDataSource>()) {
-        await getIt<TimetableLocalDataSource>().seedMockData(force: true);
-      }
-      if (!mounted) return;
-      if (blocContext.mounted) {
-        blocContext.read<TimetableBloc>().add(DaySelectedEvent(_focusedDay));
-      }
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Đã khôi phục dữ liệu ca học mẫu hệ thống.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Lỗi khi khôi phục dữ liệu: $e')),
-        );
-      }
-    }
-  }
-
   Future<void> _clearAllSlots(BuildContext blocContext) async {
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
@@ -503,10 +447,6 @@ class _TimetableViewState extends State<_TimetableView> {
                 );
               } else if (value == 'sync_api') {
                 widget.onSync();
-              } else if (value == 'clear_mock') {
-                await _clearSystemSlots(context);
-              } else if (value == 'restore_mock') {
-                await _restoreMockData(context);
               } else if (value == 'clear_all') {
                 await _clearAllSlots(context);
               }
@@ -518,7 +458,7 @@ class _TimetableViewState extends State<_TimetableView> {
                   children: [
                     Icon(Icons.calculate_outlined, size: 20, color: Colors.indigo),
                     SizedBox(width: 10),
-                    Text('Dự phóng GPA học tập'),
+                    Text('Tính điểm GPA'),
                   ],
                 ),
               ),
@@ -550,27 +490,6 @@ class _TimetableViewState extends State<_TimetableView> {
                     Icon(Icons.cloud_sync_outlined, size: 20, color: Colors.blueAccent),
                     SizedBox(width: 10),
                     Text('Đồng bộ máy chủ trường (API)'),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'clear_mock',
-                child: Row(
-                  children: [
-                    Icon(Icons.cleaning_services_outlined, size: 20, color: Colors.blue),
-                    SizedBox(width: 10),
-                    Text('Xóa ca mẫu (Chỉ giữ ca tự tạo)'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'restore_mock',
-                child: Row(
-                  children: [
-                    Icon(Icons.restore_page_outlined, size: 20, color: Colors.green),
-                    SizedBox(width: 10),
-                    Text('Khôi phục ca mẫu hệ thống'),
                   ],
                 ),
               ),
@@ -829,6 +748,42 @@ class _TimetableViewState extends State<_TimetableView> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              onPressed: () => _showAddSlotModal(context),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Thêm ca học cho ngày này'),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Text(
+                                'Thêm ca học thủ công hoặc đồng bộ lịch để nhận thông báo nhắc trước giờ vào lớp.',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () => _showAddSlotModal(context),
+                                  icon: const Icon(Icons.add_rounded, size: 18),
+                                  label: const Text('Thêm ca học thủ công'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: widget.onSync,
+                                  icon: const Icon(Icons.sync_rounded, size: 18),
+                                  label: const Text('Đồng bộ từ trường'),
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -1490,8 +1445,8 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
                       key: const ValueKey('add_slot_building_field'),
                       controller: _buildingController,
                       decoration: const InputDecoration(
-                        labelText: 'Tòa nhà',
-                        hintText: 'VD: H2',
+                        labelText: 'Địa điểm',
+                        hintText: 'VD: Cơ sở 1, Tòa H2...',
                         prefixIcon: Icon(Icons.business_outlined),
                         border: OutlineInputBorder(),
                       ),

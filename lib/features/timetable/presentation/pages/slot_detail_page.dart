@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -7,6 +9,7 @@ import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
 import '../../../notes/domain/entities/lecture_note.dart';
 import '../../../notes/domain/repositories/note_repository.dart';
+import '../../domain/entities/assignment_deadline.dart';
 import '../../domain/entities/campus_building.dart';
 import '../../domain/entities/subject.dart';
 import '../../domain/entities/timetable_slot.dart';
@@ -26,11 +29,15 @@ class SlotDetailPage extends StatefulWidget {
 }
 
 class _SlotDetailPageState extends State<SlotDetailPage> {
+  final _secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+  );
   bool _isLoading = true;
   TimetableSlot? _slot;
   Subject? _subject;
   CampusBuilding? _building;
   List<LectureNote> _linkedNotes = [];
+  List<AssignmentDeadline> _deadlines = [];
 
   bool _isReminderEnabled = true;
   int _reminderLeadMinutes = 15; // Mặc định 15 phút theo đặc tả FR-06
@@ -39,6 +46,247 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
   void initState() {
     super.initState();
     _loadSlotDetails();
+  }
+
+  Future<void> _loadDeadlines(String subjectId) async {
+    try {
+      final raw = await _secureStorage.read(key: 'subject_deadlines_$subjectId');
+      if (raw != null && raw.isNotEmpty) {
+        final List list = jsonDecode(raw);
+        final loaded = list.map((item) {
+          return AssignmentDeadline(
+            id: item['id'] as String,
+            subjectId: item['subjectId'] as String,
+            title: item['title'] as String,
+            description: item['description'] as String?,
+            dueDate: DateTime.parse(item['dueDate'] as String),
+            isCompleted: item['isCompleted'] as bool? ?? false,
+            priority: DeadlinePriority.values.firstWhere(
+              (p) => p.name == item['priority'],
+              orElse: () => DeadlinePriority.medium,
+            ),
+            createdAt: DateTime.parse(item['createdAt'] as String),
+            updatedAt: DateTime.parse(item['updatedAt'] as String),
+          );
+        }).toList();
+
+        if (mounted) {
+          setState(() {
+            _deadlines = loaded;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveDeadlines() async {
+    if (_slot == null) return;
+    try {
+      final encoded = jsonEncode(_deadlines.map((d) => {
+        'id': d.id,
+        'subjectId': d.subjectId,
+        'title': d.title,
+        'description': d.description,
+        'dueDate': d.dueDate.toIso8601String(),
+        'isCompleted': d.isCompleted,
+        'priority': d.priority.name,
+        'createdAt': d.createdAt.toIso8601String(),
+        'updatedAt': d.updatedAt.toIso8601String(),
+      }).toList());
+      await _secureStorage.write(
+        key: 'subject_deadlines_${_slot!.subjectId}',
+        value: encoded,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _toggleDeadline(AssignmentDeadline deadline) async {
+    final updated = deadline.copyWith(
+      isCompleted: !deadline.isCompleted,
+      updatedAt: DateTime.now(),
+    );
+    setState(() {
+      final index = _deadlines.indexWhere((d) => d.id == deadline.id);
+      if (index != -1) {
+        _deadlines[index] = updated;
+      }
+    });
+    await _saveDeadlines();
+  }
+
+  Future<void> _deleteDeadline(String id) async {
+    setState(() {
+      _deadlines.removeWhere((d) => d.id == id);
+    });
+    await _saveDeadlines();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xóa hạn nộp bài.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showAddDeadlineModal() async {
+    if (_slot == null) return;
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    DateTime selectedDate = DateTime.now().add(const Duration(days: 7));
+    DeadlinePriority selectedPriority = DeadlinePriority.medium;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: bottomInset + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Thêm hạn nộp bài / Nhiệm vụ',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tên bài tập / nhiệm vụ *',
+                        hintText: 'Ví dụ: Bài tập lớn tuần 5, Tiểu luận...',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.assignment_outlined),
+                      ),
+                      autofocus: true,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        labelText: 'Ghi chú thêm (tùy chọn)',
+                        hintText: 'Yêu cầu định dạng nộp file PDF...',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.notes_rounded),
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_outlined),
+                      title: const Text('Hạn nộp:'),
+                      subtitle: Text(
+                        DateFormat('dd/MM/yyyy').format(selectedDate),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked != null) {
+                            setModalState(() {
+                              selectedDate = picked;
+                            });
+                          }
+                        },
+                        child: const Text('Chọn ngày'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Mức độ ưu tiên:',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    SegmentedButton<DeadlinePriority>(
+                      segments: const [
+                        ButtonSegment(
+                          value: DeadlinePriority.low,
+                          label: Text('Thấp'),
+                        ),
+                        ButtonSegment(
+                          value: DeadlinePriority.medium,
+                          label: Text('Vừa'),
+                        ),
+                        ButtonSegment(
+                          value: DeadlinePriority.high,
+                          label: Text('Cao'),
+                        ),
+                      ],
+                      selected: {selectedPriority},
+                      onSelectionChanged: (set) {
+                        setModalState(() {
+                          selectedPriority = set.first;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(modalCtx).pop(),
+                          child: const Text('Hủy'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () {
+                            final title = titleController.text.trim();
+                            if (title.isEmpty) return;
+
+                            final newDeadline = AssignmentDeadline(
+                              id: const Uuid().v4(),
+                              subjectId: _slot!.subjectId,
+                              title: title,
+                              description: descController.text.trim().isEmpty
+                                  ? null
+                                  : descController.text.trim(),
+                              dueDate: selectedDate,
+                              priority: selectedPriority,
+                              createdAt: DateTime.now(),
+                              updatedAt: DateTime.now(),
+                            );
+
+                            setState(() {
+                              _deadlines.add(newDeadline);
+                            });
+                            _saveDeadlines();
+                            Navigator.of(modalCtx).pop();
+                          },
+                          child: const Text('Thêm nhiệm vụ'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadSlotDetails() async {
@@ -66,6 +314,25 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
           _isLoading = false;
         });
       }
+
+      // Nạp cài đặt thông báo đã lưu
+      try {
+        final savedMinsStr = await _secureStorage.read(key: 'slot_reminder_mins_${slot.id}') ??
+            await _secureStorage.read(key: 'reminder_lead_minutes_v1');
+        final savedEnabledStr = await _secureStorage.read(key: 'slot_reminder_enabled_${slot.id}') ??
+            await _secureStorage.read(key: 'reminder_enabled_v1');
+        final mins = savedMinsStr != null ? (int.tryParse(savedMinsStr) ?? 15) : 15;
+        final enabled = savedEnabledStr != 'false';
+
+        if (mounted) {
+          setState(() {
+            _reminderLeadMinutes = mins;
+            _isReminderEnabled = enabled;
+          });
+        }
+      } catch (_) {}
+
+      await _loadDeadlines(slot.subjectId);
 
       // Tải danh sách ghi chú đã gắn kết với ca học này
       if (getIt.isRegistered<NoteRepository>()) {
@@ -425,7 +692,7 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                         context,
                         icon: Icons.business_outlined,
                         label: AppStrings.building,
-                        value: _building?.name ?? 'Tòa ${slot.buildingId}',
+                        value: _building?.name ?? '${slot.buildingId}',
                       ),
                     ],
                   ],
@@ -467,10 +734,20 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                         ),
                         Switch(
                           value: _isReminderEnabled,
-                          onChanged: (val) {
+                          onChanged: (val) async {
                             setState(() {
                               _isReminderEnabled = val;
                             });
+                            if (_slot != null) {
+                              await _secureStorage.write(
+                                key: 'slot_reminder_enabled_${_slot!.id}',
+                                value: val.toString(),
+                              );
+                              await _secureStorage.write(
+                                key: 'reminder_enabled_v1',
+                                value: val.toString(),
+                              );
+                            }
                           },
                         ),
                       ],
@@ -492,11 +769,21 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                           return ChoiceChip(
                             label: Text('$mins phút'),
                             selected: isSelected,
-                            onSelected: (selected) {
+                            onSelected: (selected) async {
                               if (selected) {
                                 setState(() {
                                   _reminderLeadMinutes = mins;
                                 });
+                                if (_slot != null) {
+                                  await _secureStorage.write(
+                                    key: 'slot_reminder_mins_${_slot!.id}',
+                                    value: mins.toString(),
+                                  );
+                                  await _secureStorage.write(
+                                    key: 'reminder_lead_minutes_v1',
+                                    value: mins.toString(),
+                                  );
+                                }
                               }
                             },
                           );
@@ -508,9 +795,243 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
               ),
             ),
 
+            const SizedBox(height: 20),
+
+            // 4. Hạn nộp bài & Nhiệm vụ môn học
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.assignment_turned_in_outlined,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Hạn nộp & Nhiệm vụ (${_deadlines.length})',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton.icon(
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Thêm'),
+                          onPressed: _showAddDeadlineModal,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_deadlines.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 12,
+                        ),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Text(
+                          'Chưa có bài tập hoặc hạn nộp nào cho môn này.\nBấm "Thêm" để lưu hạn nộp tiểu luận, bài tập lớn, thuyết trình.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    else
+                      ..._deadlines.map((deadline) {
+                        Color priorityColor;
+                        String priorityLabel;
+                        switch (deadline.priority) {
+                          case DeadlinePriority.high:
+                            priorityColor = Colors.red;
+                            priorityLabel = 'Gấp';
+                            break;
+                          case DeadlinePriority.medium:
+                            priorityColor = Colors.orange;
+                            priorityLabel = 'Vừa';
+                            break;
+                          case DeadlinePriority.low:
+                            priorityColor = Colors.blue;
+                            priorityLabel = 'Thong thả';
+                            break;
+                        }
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: deadline.isCompleted
+                                ? theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.3)
+                                : theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: deadline.isCompleted
+                                  ? theme.colorScheme.outlineVariant
+                                  : priorityColor.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            leading: Checkbox(
+                              value: deadline.isCompleted,
+                              onChanged: (_) => _toggleDeadline(deadline),
+                            ),
+                            title: Text(
+                              deadline.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                decoration: deadline.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: deadline.isCompleted
+                                    ? theme.colorScheme.onSurfaceVariant
+                                    : null,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (deadline.description != null &&
+                                    deadline.description!.isNotEmpty)
+                                  Text(
+                                    deadline.description!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.event_outlined,
+                                      size: 14,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      DateFormat('dd/MM/yyyy')
+                                          .format(deadline.dueDate),
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: priorityColor
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        priorityLabel,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: priorityColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    if (deadline.isCompleted)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              Colors.green.withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'Đã nộp',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                      )
+                                    else if (deadline.isOverdue)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              Colors.red.withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'Quá hạn',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        '(${deadline.daysRemaining} ngày nữa)',
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color:
+                                              theme.colorScheme.onSurfaceVariant,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                              ),
+                              tooltip: 'Xóa hạn nộp',
+                              onPressed: () => _deleteDeadline(deadline.id),
+                            ),
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 24),
 
-            // 4. Mục Ghi chú liên kết ca học
+            // 5. Mục Ghi chú liên kết ca học
             if (_linkedNotes.isNotEmpty) ...[
               Card(
                 shape: RoundedRectangleBorder(
@@ -969,7 +1490,8 @@ class _EditSlotBottomSheetState extends State<_EditSlotBottomSheet> {
                     child: TextFormField(
                       controller: _buildingController,
                       decoration: const InputDecoration(
-                        labelText: 'Tòa nhà',
+                        labelText: 'Địa điểm',
+                        hintText: 'VD: Cơ sở 1, Tòa H2...',
                         prefixIcon: Icon(Icons.business_outlined),
                         border: OutlineInputBorder(),
                       ),

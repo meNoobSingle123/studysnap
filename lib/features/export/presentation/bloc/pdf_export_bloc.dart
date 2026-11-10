@@ -222,11 +222,14 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
       final exams = await timetableRepository.getExams();
       final buildings = await timetableRepository.getBuildings();
 
+      final activeSubjectIds = subjects.map((s) => s.id).toSet();
+      final relevantExams = exams.where((e) => activeSubjectIds.contains(e.subjectId)).toList();
+
       return TimetableExportData(
         term: 'Học kỳ 2026-1',
         subjects: subjects,
         slots: slots,
-        exams: exams,
+        exams: relevantExams,
         buildings: buildings,
       );
     } catch (_) {

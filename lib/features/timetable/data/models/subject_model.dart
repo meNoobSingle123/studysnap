@@ -11,6 +11,7 @@ class SubjectModel extends Subject {
     required super.name,
     required super.credits,
     required super.colorArgb,
+    super.gradePoint,
     required super.createdAt,
     required super.updatedAt,
     super.deletedAt,
@@ -23,6 +24,7 @@ class SubjectModel extends Subject {
       name: entity.name,
       credits: entity.credits,
       colorArgb: entity.colorArgb,
+      gradePoint: entity.gradePoint,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       deletedAt: entity.deletedAt,
@@ -36,6 +38,9 @@ class SubjectModel extends Subject {
       name: json['name'] as String,
       credits: json['credits'] as int,
       colorArgb: json['colorArgb'] as int? ?? 0xFF1E56A0,
+      gradePoint: json['gradePoint'] != null
+          ? (json['gradePoint'] as num).toDouble()
+          : null,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
@@ -54,6 +59,7 @@ class SubjectModel extends Subject {
         'name': name,
         'credits': credits,
         'colorArgb': colorArgb,
+        'gradePoint': gradePoint,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'deletedAt': deletedAt?.toIso8601String(),

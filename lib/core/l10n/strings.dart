@@ -106,7 +106,6 @@ abstract final class AppStrings {
 
   // Tools & Settings Feature (S10, S13)
   static const String toolsTitle = 'Công cụ & Cài đặt';
-  static const String mapNavigation = 'Chỉ đường khuôn viên (Google Maps)';
   static const String ocrScanner = 'Nhận diện chữ từ ảnh (OCR)';
   static const String appSettings = 'Cài đặt hệ thống';
 
@@ -132,16 +131,16 @@ abstract final class AppStrings {
   static const String nextClassCountdown = 'Ca học tiếp theo';
   static const String noUpcomingClass = 'Không có ca học nào sắp tới hôm nay';
   static const String noClassToday = 'Hôm nay không có ca học nào';
-  static const String gpaProjectionTitle = 'Dự phóng GPA';
+  static const String gpaProjectionTitle = 'Tính điểm GPA';
   static const String currentGpa = 'GPA hiện tại';
   static const String completedCredits = 'Tín chỉ đã tích lũy';
   static const String remainingCredits = 'Tín chỉ còn lại';
   static const String targetGpa = 'GPA mục tiêu';
   static const String calculate = 'Tính toán';
-  static const String gpaResult = 'Kết quả dự phóng';
+  static const String gpaResult = 'Điểm cần đạt';
   static const String slotDetails = 'Chi tiết ca học';
   static const String room = 'Phòng';
-  static const String building = 'Tòa nhà';
+  static const String building = 'Địa điểm';
   static const String credits = 'Tín chỉ';
   static const String reminderLead = 'Nhắc nhở trước';
   static const String getDirections = 'Chỉ đường';
@@ -163,13 +162,13 @@ abstract final class AppStrings {
   static const String openWithExternalApp = 'Mở ứng dụng ngoài';
   static const String pdfGeneratedSuccess = 'Tạo file PDF thành công';
   static const String benchmarkTitle = 'Chỉ số hiệu năng (NFR Benchmark)';
-  static const String timetablePdfHeader = 'THỜI KHÓA BIỂU & LỊCH THI HỌC KỲ';
+  static const String timetablePdfHeader = 'THỜI KHÓA BIỂU HỌC TẬP';
   static const String notePdfHeader = 'PHIẾU GHI CHÚ BÀI GIẢNG';
-  static const String institutionName = 'ĐẠI HỌC KHOA HỌC TỰ NHIÊN - ĐHQG-HCM';
+  static const String institutionName = 'STUDYSNAP - SỔ TAY HỌC TẬP THÔNG MINH';
 
   // Notifications Feature (Huy - CĐ 7)
   static const String notificationTitle = 'Thông báo & Nhắc giờ';
-  static const String notificationSettingsTitle = 'Cài đặt Nhắc giờ học (CĐ 7)';
+  static const String notificationSettingsTitle = 'Cài đặt Nhắc giờ học';
   static const String notificationPermissionGranted = 'Đã cấp quyền thông báo';
   static const String notificationPermissionDenied = 'Chưa cấp quyền thông báo';
   static const String exactAlarmPermissionTitle = 'Quyền báo giờ chính xác (Exact Alarm)';
@@ -205,7 +204,6 @@ abstract final class AppStrings {
   static const String ocrScannerSubtitle = 'Chụp/chọn ảnh để nhận diện chữ in tự động';
   static const String scannerSubtitle = 'Quét tài liệu và chụp ảnh bài giảng';
   static const String notificationSubtitle = 'Lên lịch nhắc tự động trước ca học';
-  static const String mapNavigationSubtitle = 'Chỉ đường đi bộ đến tòa nhà trong khuôn viên';
   static const String appSettingsSubtitle = 'Cấu hình ứng dụng và lưu trữ';
 
   // Platform Safeguard
@@ -230,13 +228,6 @@ abstract final class AppStrings {
   static const String ocrInsertToNote = 'Chèn vào ghi chú';
   static const String ocrNoTextFound = '(Không thấy chữ trong ảnh)';
   static const String ocrErrorPrefix = 'Không nhận diện được: ';
-
-  // Location
-  static const String locationNotRetrieved = 'Chưa lấy vị trí';
-  static const String locating = 'Đang lấy vị trí...';
-  static const String locationPermissionError = 'Không lấy được vị trí (tắt dịch vụ hoặc từ chối quyền)';
-  static const String cannotOpenMaps = 'Không mở được Google Maps';
-  static const String tagClassroomLocation = 'Gắn vị trí phòng học';
 
   // Notes
   static const String videoLecture = 'Video bài giảng';

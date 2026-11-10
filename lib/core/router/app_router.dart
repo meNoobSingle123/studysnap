@@ -11,6 +11,7 @@ import '../../features/ocr/ocr_scanner_page.dart';
 import '../../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../../features/scanner/presentation/pages/scanner_camera_page.dart';
 import '../../features/security/presentation/pages/app_lock_page.dart';
+import '../../features/settings/presentation/pages/system_settings_page.dart';
 import '../../features/settings/presentation/pages/tools_page.dart';
 import '../../features/timetable/presentation/pages/gpa_page.dart';
 import '../../features/timetable/presentation/pages/slot_detail_page.dart';
@@ -109,10 +110,13 @@ abstract final class AppRouter {
               state.uri.queryParameters['subjectId'];
           final slotId = extraMap?['slotId'] as String? ??
               state.uri.queryParameters['slotId'];
+          final initialImagePaths =
+              extraMap?['initialImagePaths'] as List<String>?;
           return NoteEditorPage(
             noteId: noteId,
             subjectId: subjectId,
             slotId: slotId,
+            initialImagePaths: initialImagePaths,
           );
         },
       ),
@@ -158,6 +162,11 @@ abstract final class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         path: Routes.notifications,
         builder: (context, state) => const NotificationSettingsPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: Routes.systemSettings,
+        builder: (context, state) => const SystemSettingsPage(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

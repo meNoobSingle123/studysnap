@@ -140,7 +140,13 @@ class _ScannerCameraView extends StatelessWidget {
                     label: const Text(AppStrings.createNoteFromImage),
                     onPressed: () {
                       final newNoteId = const Uuid().v4();
-                      context.push(Routes.noteEdit(newNoteId));
+                      final imagePaths = state.capturedImages.map((f) => f.path).toList();
+                      context.push(
+                        Routes.noteEdit(newNoteId),
+                        extra: {
+                          'initialImagePaths': imagePaths,
+                        },
+                      );
                     },
                   ),
                 ),

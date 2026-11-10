@@ -29,10 +29,13 @@ abstract final class Routes {
   static String pdfExportRoute({String? noteId}) =>
       noteId != null ? '/export/pdf?noteId=$noteId' : '/export/pdf';
 
-  // Notifications Feature (Huy - CĐ 7)
+  // Notifications Feature
   static const String notifications = '/settings/notifications';
 
-  // OCR Scanner Feature (Khiêm - CĐ 12)
+  // System Settings Feature
+  static const String systemSettings = '/settings/system';
+
+  // OCR Scanner Feature
   static const String ocrScanner = '/ocr/scanner';
 }
 

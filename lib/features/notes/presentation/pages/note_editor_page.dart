@@ -23,19 +23,26 @@ class NoteEditorPage extends StatelessWidget {
   final String noteId;
   final String? subjectId;
   final String? slotId;
+  final List<String>? initialImagePaths;
 
   const NoteEditorPage({
     super.key,
     required this.noteId,
     this.subjectId,
     this.slotId,
+    this.initialImagePaths,
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => getIt<NoteEditorBloc>()
-        ..add(LoadNote(noteId, subjectId: subjectId, slotId: slotId)),
+        ..add(LoadNote(
+          noteId,
+          subjectId: subjectId,
+          slotId: slotId,
+          initialImagePaths: initialImagePaths,
+        )),
       child: const _NoteEditorView(),
     );
   }
@@ -281,6 +288,13 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
       );
       if (picked != null && mounted) {
         context.read<NoteEditorBloc>().add(AddImage(picked.path));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã thêm ảnh vào ghi chú thành công!'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -501,6 +515,70 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
     );
   }
 
+  Future<void> _exportPdf(NoteEditorState state) async {
+    if (state is! NoteEditorLoaded) return;
+    final currentNote = state.note;
+    final updated = currentNote.copyWith(
+      title: _titleController.text,
+      bodyText: _bodyController.text,
+      updatedAt: DateTime.now(),
+    );
+    await context.read<NoteEditorBloc>().saveNoteUseCase(updated);
+    if (mounted) {
+      context.push('${Routes.pdfExport}?noteId=${currentNote.id}');
+    }
+  }
+
+  void _openAiAssistant() {
+    final content = _bodyController.text.trim();
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vui lòng nhập nội dung bài học để AI tóm tắt hoặc tạo câu hỏi.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    AiAssistantBottomSheet.show(
+      context: context,
+      noteTitle: _titleController.text.trim(),
+      noteContent: content,
+      subjectName: _resolvedSubjectName,
+      onInsertToNote: (markdownText) {
+        final current = _bodyController.text;
+        final newContent = '$current$markdownText';
+        _bodyController.text = newContent;
+        context.read<NoteEditorBloc>().add(UpdateContent(bodyText: newContent));
+      },
+    );
+  }
+
+  void _openOcr() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OcrScannerPage(
+          onInsert: (text) {
+            final ctrl = _bodyController;
+            final old = ctrl.text;
+            final sel = ctrl.selection;
+            final pos = sel.isValid ? sel.start : old.length;
+            final newText = old.substring(0, pos) + text + old.substring(pos);
+            ctrl.value = TextEditingValue(
+              text: newText,
+              selection: TextSelection.collapsed(offset: pos + text.length),
+            );
+            context.read<NoteEditorBloc>().add(UpdateContent(bodyText: newText));
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
@@ -531,134 +609,58 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
               leading: BackButton(
                 onPressed: _handleBackNavigation,
               ),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(AppStrings.noteEditorTitle),
-                  if (state is NoteEditorLoaded)
-                    Text(
-                      state.isSaving
-                          ? AppStrings.savingStatus
-                          : (state.isSaveSuccess && !state.hasUnsavedChanges
-                              ? AppStrings.savedStatus
-                              : ''),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: state.isSaving
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.green,
-                          ),
-                    ),
-                ],
+              title: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _titleController,
+                builder: (context, val, _) {
+                  final titleText = val.text.trim();
+                  return Text(
+                    titleText.isNotEmpty ? titleText : AppStrings.noteEditorTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  );
+                },
               ),
               actions: [
-                // Nút Xuất PDF cho bài ghi chú hiện tại (CĐ 4 & S09)
-                if (state is NoteEditorLoaded)
-                  IconButton(
-                    tooltip: 'Xuất PDF bài ghi chú',
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    onPressed: () async {
-                      final currentNote = state.note;
-                      final updated = currentNote.copyWith(
-                        title: _titleController.text,
-                        bodyText: _bodyController.text,
-                        updatedAt: DateTime.now(),
-                      );
-                      await context.read<NoteEditorBloc>().saveNoteUseCase(updated);
-                      if (context.mounted) {
-                        context.push('${Routes.pdfExport}?noteId=${currentNote.id}');
-                      }
-                    },
+                Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: Center(
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : (state is NoteEditorLoaded &&
+                                state.isSaveSuccess &&
+                                !state.hasUnsavedChanges
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_rounded,
+                                        size: 14, color: Colors.green),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Đã lưu',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink()),
                   ),
-                // Nút Trợ lý AI: Tóm tắt & Sinh câu hỏi ôn tập
-                IconButton(
-                  tooltip: 'Trợ lý Học tập AI',
-                  icon: const Icon(Icons.auto_awesome_rounded),
-                  onPressed: () {
-                    final content = _bodyController.text.trim();
-                    if (content.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Vui lòng nhập nội dung bài học để AI tóm tắt hoặc tạo câu hỏi.',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      return;
-                    }
-
-                    AiAssistantBottomSheet.show(
-                      context: context,
-                      noteTitle: _titleController.text.trim(),
-                      noteContent: content,
-                      subjectName: _resolvedSubjectName,
-                      onInsertToNote: (markdownText) {
-                        final current = _bodyController.text;
-                        final newContent = '$current$markdownText';
-                        _bodyController.text = newContent;
-                        context
-                            .read<NoteEditorBloc>()
-                            .add(UpdateContent(bodyText: newContent));
-                      },
-                    );
-                  },
                 ),
-                // Nút OCR: chèn chữ từ ảnh vào vị trí con trỏ (CĐ 12 / FR-14)
-                IconButton(
-                  tooltip: 'Nhận diện chữ từ ảnh (OCR)',
-                  icon: const Icon(Icons.document_scanner_outlined),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OcrScannerPage(
-                          onInsert: (text) {
-                            final ctrl = _bodyController;
-                            final old = ctrl.text;
-                            final sel = ctrl.selection;
-                            final pos = sel.isValid ? sel.start : old.length;
-                            final newText = old.substring(0, pos) +
-                                text +
-                                old.substring(pos);
-                            ctrl.value = TextEditingValue(
-                              text: newText,
-                              selection:
-                                  TextSelection.collapsed(offset: pos + text.length),
-                            );
-                            context
-                                .read<NoteEditorBloc>()
-                                .add(UpdateContent(bodyText: newText));
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                if (isSaving)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  )
-                else
-                  TextButton.icon(
-                    onPressed: () {
-                      context.read<NoteEditorBloc>().add(
-                            UpdateContent(
-                              title: _titleController.text,
-                              bodyText: _bodyController.text,
-                            ),
-                          );
-                      context.read<NoteEditorBloc>().add(const SaveNote());
-                    },
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text(AppStrings.save),
-                  ),
               ],
             ),
             body: switch (state) {
@@ -987,27 +989,27 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                           // 2.1 Khay ảnh đính kèm (Horizontal Image Tray)
                           if (state.note.imagePaths.isNotEmpty)
                             Container(
-                              height: 96,
-                              margin: const EdgeInsets.only(bottom: 8),
+                              height: 116,
+                              margin: const EdgeInsets.only(bottom: 12),
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: state.note.imagePaths.length + 1,
                                 separatorBuilder: (_, _) =>
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 10),
                                 itemBuilder: (context, index) {
                                   if (index == state.note.imagePaths.length) {
                                     return OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
                                           borderRadius:
-                                              BorderRadius.circular(8),
+                                              BorderRadius.circular(10),
                                         ),
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 12),
+                                            horizontal: 14),
                                       ),
                                       icon: const Icon(
                                           Icons.add_photo_alternate_outlined,
-                                          size: 18),
+                                          size: 20),
                                       label: const Text('Thêm ảnh'),
                                       onPressed: _showAddImageModal,
                                     );
@@ -1019,17 +1021,18 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                                       InkWell(
                                         onTap: () => _viewOrAnnotateImage(
                                             state.note.id, imgPath),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                         child: Container(
-                                          width: 88,
-                                          height: 88,
+                                          width: 110,
+                                          height: 110,
                                           decoration: BoxDecoration(
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                                BorderRadius.circular(10),
                                             border: Border.all(
                                               color: theme
                                                   .colorScheme.outlineVariant
-                                                  .withValues(alpha: 0.6),
+                                                  .withValues(alpha: 0.8),
+                                              width: 1.5,
                                             ),
                                           ),
                                           clipBehavior: Clip.antiAlias,
@@ -1040,14 +1043,15 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                                                 (context, error, stackTrace) =>
                                                     const Center(
                                               child: Icon(Icons.broken_image,
-                                                  size: 24, color: Colors.grey),
+                                                  size: 28, color: Colors.grey),
                                             ),
                                           ),
                                         ),
                                       ),
+                                      // Nút xóa ảnh
                                       Positioned(
-                                        top: 2,
-                                        right: 2,
+                                        top: 4,
+                                        right: 4,
                                         child: Material(
                                           color: Colors.black54,
                                           shape: const CircleBorder(),
@@ -1059,11 +1063,38 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                                                   .add(RemoveImage(imgPath));
                                             },
                                             child: const Padding(
-                                              padding: EdgeInsets.all(3.0),
+                                              padding: EdgeInsets.all(4.0),
                                               child: Icon(Icons.close,
                                                   size: 14,
                                                   color: Colors.white),
                                             ),
+                                          ),
+                                        ),
+                                      ),
+                                      // Nhãn vẽ ghi chú / Xem ảnh
+                                      Positioned(
+                                        bottom: 4,
+                                        left: 4,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.6),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.edit, size: 10, color: Colors.white),
+                                              SizedBox(width: 3),
+                                              Text(
+                                                'Vẽ lên ảnh',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -1160,6 +1191,126 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
                   },
                 ),
             },
+            bottomNavigationBar: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .outlineVariant
+                        .withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      // 1. Quét chữ OCR
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _openOcr,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.document_scanner_rounded,
+                                  size: 22,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Nhận diện chữ',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 2. Trợ lý AI
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _openAiAssistant,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 6),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 22,
+                                  color: Color(0xFF5E48E8),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Trợ lý học tập',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF5E48E8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 3. Xuất PDF
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _exportPdf(state),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 6),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.picture_as_pdf_rounded,
+                                  size: 22,
+                                  color: Color(0xFFE53935),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Xuất file PDF',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFE53935),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         );
       },

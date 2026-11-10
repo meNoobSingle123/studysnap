@@ -456,6 +456,15 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
                       ),
                     ),
                     IconButton(
+                      icon: const Icon(Icons.key_rounded),
+                      tooltip: 'Cài đặt Khóa API AI',
+                      onPressed: () {
+                        context
+                            .read<AiAssistantBloc>()
+                            .add(const ConfigureApiKeyRequested());
+                      },
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.close_rounded),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -624,6 +633,10 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    if (_apiKeyController.text.isEmpty && existingKey != null && existingKey.isNotEmpty) {
+      _apiKeyController.text = existingKey;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -643,7 +656,7 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Khóa API AI đã được hệ thống cấu hình sẵn. Bạn có thể cập nhật khóa mới nếu muốn tùy chỉnh riêng.',
+            'Khóa API AI dùng để kết nối với Google Gemini. Nếu nhập sai hoặc hết hạn, bạn có thể xóa hoặc dán lại khóa mới tại đây.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -656,21 +669,51 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
               labelText: 'Nhập Khóa API AI',
               hintText: 'AIzaSy...',
               prefixIcon: const Icon(Icons.password_rounded),
-              suffixIcon: IconButton(
-                tooltip: 'Dán từ bộ nhớ tạm',
-                icon: const Icon(Icons.paste_rounded),
-                onPressed: () async {
-                  final data = await Clipboard.getData(Clipboard.kTextPlain);
-                  if (data?.text != null) {
-                    _apiKeyController.text = data!.text!.trim();
-                  }
-                },
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_apiKeyController.text.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Xóa trắng',
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: () {
+                        setState(() {
+                          _apiKeyController.clear();
+                        });
+                      },
+                    ),
+                  IconButton(
+                    tooltip: 'Dán từ bộ nhớ tạm',
+                    icon: const Icon(Icons.paste_rounded),
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      if (data?.text != null) {
+                        setState(() {
+                          _apiKeyController.text = data!.text!.trim();
+                        });
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
+              if (existingKey != null && existingKey.isNotEmpty) ...[
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _apiKeyController.clear();
+                    context
+                        .read<AiAssistantBloc>()
+                        .add(const ConfigureApiKeyRequested(clearExisting: true));
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Xóa khóa'),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () {
@@ -747,24 +790,24 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
               children: [
-                if (state.isApiKeyError) ...[
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      context
-                          .read<AiAssistantBloc>()
-                          .add(const CheckApiKeyStatus());
-                    },
-                    icon: const Icon(Icons.key_rounded),
-                    label: const Text('Cài lại API Key'),
-                  ),
-                  const SizedBox(width: 12),
-                ],
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _apiKeyController.clear();
+                    context
+                        .read<AiAssistantBloc>()
+                        .add(const ConfigureApiKeyRequested(clearExisting: true));
+                  },
+                  icon: const Icon(Icons.key_rounded, size: 18),
+                  label: const Text('Đổi / Nhập lại Key'),
+                ),
                 FilledButton.icon(
                   onPressed: _triggerAnalysis,
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
                   label: const Text('Thử lại'),
                 ),
               ],

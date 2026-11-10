@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/lecture_note.dart';
 import '../../domain/usecases/delete_note_usecase.dart';
 import '../../domain/usecases/watch_all_notes_usecase.dart';
+import '../../../timetable/domain/entities/subject.dart';
 import '../../../timetable/domain/usecases/get_subjects_usecase.dart';
 import 'note_list_event.dart';
 import 'note_list_state.dart';
@@ -15,6 +16,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
   final GetSubjectsUseCase getSubjectsUseCase;
 
   StreamSubscription<List<LectureNote>>? _notesSubscription;
+  StreamSubscription<List<Subject>>? _subjectsSubscription;
 
   NoteListBloc({
     required this.watchAllNotesUseCase,
@@ -23,6 +25,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
   }) : super(const NoteListState()) {
     on<LoadNotesStarted>(_onLoadNotesStarted);
     on<NotesStreamUpdated>(_onNotesStreamUpdated);
+    on<SubjectsStreamUpdated>(_onSubjectsStreamUpdated);
     on<SearchQueryChanged>(_onSearchQueryChanged);
     on<FilterSubjectChanged>(_onFilterSubjectChanged);
     on<FilterDateChanged>(_onFilterDateChanged);
@@ -40,6 +43,15 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       final subjects = await getSubjectsUseCase.getSubjects();
       final subjectsMap = {for (final s in subjects) s.id: s};
       emit(state.copyWith(subjectsMap: subjectsMap));
+
+      await _subjectsSubscription?.cancel();
+      _subjectsSubscription = getSubjectsUseCase.watchSubjects().listen(
+        (subjects) {
+          if (!isClosed) {
+            add(SubjectsStreamUpdated(subjects));
+          }
+        },
+      );
 
       await _notesSubscription?.cancel();
       _notesSubscription = watchAllNotesUseCase().listen(
@@ -81,6 +93,24 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
     emit(state.copyWith(
       status: NoteListStatus.success,
       allNotes: event.notes,
+      filteredNotes: filtered,
+    ));
+  }
+
+  void _onSubjectsStreamUpdated(
+    SubjectsStreamUpdated event,
+    Emitter<NoteListState> emit,
+  ) {
+    final subjectsMap = {for (final s in event.subjects) s.id: s};
+    final filtered = filterAndSortNotes(
+      notes: state.allNotes,
+      query: state.searchQuery,
+      selectedSubjectId: state.selectedSubjectId,
+      selectedDate: state.selectedDate,
+      sortOption: state.sortOption,
+    );
+    emit(state.copyWith(
+      subjectsMap: subjectsMap,
       filteredNotes: filtered,
     ));
   }
@@ -249,6 +279,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
   @override
   Future<void> close() {
     _notesSubscription?.cancel();
+    _subjectsSubscription?.cancel();
     return super.close();
   }
 }

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../timetable/domain/entities/subject.dart';
 import '../../domain/entities/lecture_note.dart';
 import 'note_list_state.dart';
 
@@ -21,6 +22,15 @@ class NotesStreamUpdated extends NoteListEvent {
 
   @override
   List<Object?> get props => [notes];
+}
+
+class SubjectsStreamUpdated extends NoteListEvent {
+  final List<Subject> subjects;
+
+  const SubjectsStreamUpdated(this.subjects);
+
+  @override
+  List<Object?> get props => [subjects];
 }
 
 class SearchQueryChanged extends NoteListEvent {

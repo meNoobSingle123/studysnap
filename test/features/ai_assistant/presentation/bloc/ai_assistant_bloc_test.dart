@@ -72,6 +72,21 @@ void main() {
     );
 
     blocTest<AiAssistantBloc, AiAssistantState>(
+      'emits [AiAssistantNeedsApiKey] and clears key on ConfigureApiKeyRequested with clearExisting true',
+      build: () {
+        when(() => mockRepository.saveApiKey('')).thenAnswer((_) async {});
+        return bloc;
+      },
+      act: (bloc) => bloc.add(const ConfigureApiKeyRequested(clearExisting: true)),
+      expect: () => [
+        const AiAssistantNeedsApiKey(),
+      ],
+      verify: (_) {
+        verify(() => mockRepository.saveApiKey('')).called(1);
+      },
+    );
+
+    blocTest<AiAssistantBloc, AiAssistantState>(
       'saves API key and resets to AiAssistantInitial',
       build: () {
         when(() => mockRepository.saveApiKey(any())).thenAnswer((_) async {});

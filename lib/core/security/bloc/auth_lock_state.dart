@@ -16,14 +16,35 @@ class AuthLockInitial extends AuthLockState {
 class AuthLocked extends AuthLockState {
   final String? errorMessage;
   final bool isAuthenticating;
+  final bool isPinMode;
+  final int failedAttempts;
+  final DateTime? lockoutUntil;
 
   const AuthLocked({
     this.errorMessage,
     this.isAuthenticating = false,
+    this.isPinMode = false,
+    this.failedAttempts = 0,
+    this.lockoutUntil,
   });
 
+  bool get isLockedOut =>
+      lockoutUntil != null && lockoutUntil!.isAfter(DateTime.now());
+
+  int get remainingLockoutSeconds {
+    if (lockoutUntil == null) return 0;
+    final diff = lockoutUntil!.difference(DateTime.now()).inSeconds;
+    return diff > 0 ? diff : 0;
+  }
+
   @override
-  List<Object?> get props => [errorMessage, isAuthenticating];
+  List<Object?> get props => [
+        errorMessage,
+        isAuthenticating,
+        isPinMode,
+        failedAttempts,
+        lockoutUntil,
+      ];
 }
 
 /// Ứng dụng đã mở khóa thành công (Cho phép truy cập các tab học tập).

@@ -11,6 +11,14 @@ class CheckApiKeyStatus extends AiAssistantEvent {
   const CheckApiKeyStatus();
 }
 
+class ConfigureApiKeyRequested extends AiAssistantEvent {
+  final bool clearExisting;
+  const ConfigureApiKeyRequested({this.clearExisting = false});
+
+  @override
+  List<Object?> get props => [clearExisting];
+}
+
 class SaveApiKeyRequested extends AiAssistantEvent {
   final String apiKey;
   const SaveApiKeyRequested(this.apiKey);

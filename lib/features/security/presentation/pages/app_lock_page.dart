@@ -9,8 +9,8 @@ import '../../../../core/security/bloc/auth_lock_bloc.dart';
 import '../../../../core/security/bloc/auth_lock_event.dart';
 import '../../../../core/security/bloc/auth_lock_state.dart';
 
-/// Màn hình khóa ứng dụng S01 (LockPage) theo đặc tả CĐ 11 (mục 4.3, 6.2).
-/// Hỗ trợ xác thực vân tay, FaceID hoặc mã PIN thiết bị.
+/// Màn hình khóa ứng dụng S01 (LockPage) theo đặc tả CĐ 11.
+/// Hỗ trợ xác thực sinh trắc học vân tay hoặc FaceID thiết bị.
 class AppLockPage extends StatelessWidget {
   final AuthLockBloc? bloc;
   const AppLockPage({super.key, this.bloc});
@@ -199,7 +199,7 @@ class _AppLockViewState extends State<_AppLockView> {
                               ? null
                               : () {
                                   if (isNotAvailable) {
-                                    // Fallback bypass when device lacks biometrics/PIN
+                                    // Fallback bypass when device lacks biometrics
                                     context
                                         .read<AuthLockBloc>()
                                         .add(const UnlockApp());

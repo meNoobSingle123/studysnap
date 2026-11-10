@@ -46,3 +46,26 @@ class AppResumed extends AuthLockEvent {
   @override
   List<Object?> get props => [timestamp];
 }
+
+/// Gửi mã PIN để xác thực mở khóa ứng dụng.
+class SubmitPin extends AuthLockEvent {
+  final String pin;
+  const SubmitPin(this.pin);
+
+  @override
+  List<Object?> get props => [pin];
+}
+
+/// Thiết lập hoặc đổi mã PIN mới cho ứng dụng.
+class SetupPin extends AuthLockEvent {
+  final String pin;
+  const SetupPin(this.pin);
+
+  @override
+  List<Object?> get props => [pin];
+}
+
+/// Đặt lại mã PIN đã lưu.
+class ResetPin extends AuthLockEvent {
+  const ResetPin();
+}

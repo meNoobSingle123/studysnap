@@ -194,7 +194,7 @@ Future<Uint8List> _timetablePdfIsolateEntry(_TimetableIsolateParams params) asyn
                   style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800),
                 ),
                 pw.Text(
-                  'STUDYSNAP - HỆ THỐNG QUẢN LÝ HỌC TẬP THÔNG MINH',
+                  'HỆ THỐNG QUẢN LÝ HỌC TẬP & THỜI KHÓA BIỂU CÁ NHÂN',
                   style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
                 ),
               ],
@@ -241,7 +241,7 @@ Future<Uint8List> _timetablePdfIsolateEntry(_TimetableIsolateParams params) asyn
 
         // Section: Thời khóa biểu các ca học
         pw.Text(
-          '1. LỊCH HỌC TRONG TUẦN',
+          'DANH SÁCH LỊCH HỌC TRONG TUẦN',
           style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
         ),
         pw.SizedBox(height: 8),
@@ -263,7 +263,7 @@ Future<Uint8List> _timetablePdfIsolateEntry(_TimetableIsolateParams params) asyn
             cellStyle: const pw.TextStyle(fontSize: 8.5),
             cellAlignment: pw.Alignment.centerLeft,
             cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-            headers: ['Thứ', 'Giờ học', 'Mã môn', 'Tên môn học', 'Phòng', 'Tòa nhà', 'Số TC'],
+            headers: ['Thứ', 'Giờ học', 'Mã môn', 'Tên môn học', 'Phòng', 'Địa điểm', 'Số TC'],
             data: sortedSlots.map((slot) {
               final sub = params.data.findSubject(slot.subjectId);
               return [
@@ -278,25 +278,16 @@ Future<Uint8List> _timetablePdfIsolateEntry(_TimetableIsolateParams params) asyn
             }).toList(),
           ),
 
-        pw.SizedBox(height: 20),
+        if (params.data.exams.isNotEmpty) ...[
+          pw.SizedBox(height: 20),
 
-        // Section: Lịch thi học kỳ
-        pw.Text(
-          '2. LỊCH THI HỌC KỲ',
-          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
-        ),
-        pw.SizedBox(height: 8),
+          // Section: Lịch thi học kỳ
+          pw.Text(
+            'LỊCH THI HỌC KỲ',
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
+          ),
+          pw.SizedBox(height: 8),
 
-        if (params.data.exams.isEmpty)
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.grey100,
-              borderRadius: pw.BorderRadius.circular(4),
-            ),
-            child: pw.Text('Chưa có lịch thi cho học kỳ này.', style: const pw.TextStyle(fontSize: 10)),
-          )
-        else
           pw.TableHelper.fromTextArray(
             border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white),
@@ -304,7 +295,7 @@ Future<Uint8List> _timetablePdfIsolateEntry(_TimetableIsolateParams params) asyn
             cellStyle: const pw.TextStyle(fontSize: 8.5),
             cellAlignment: pw.Alignment.centerLeft,
             cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-            headers: ['Ngày thi', 'Giờ thi', 'Thời lượng', 'Mã môn', 'Tên môn học', 'Phòng thi', 'Tòa nhà'],
+            headers: ['Ngày thi', 'Giờ thi', 'Thời lượng', 'Mã môn', 'Tên môn học', 'Phòng thi', 'Địa điểm'],
             data: params.data.exams.map((exam) {
               final sub = params.data.findSubject(exam.subjectId);
               return [
@@ -318,23 +309,24 @@ Future<Uint8List> _timetablePdfIsolateEntry(_TimetableIsolateParams params) asyn
               ];
             }).toList(),
           ),
+        ],
 
         pw.SizedBox(height: 24),
 
-        // Ghi chú & chữ ký
+        // Ghi chú & chân trang
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              '* Lưu ý: Sinh viên có mặt tại phòng thi trước giờ thi 15 phút.',
-              style: const pw.TextStyle(fontSize: 8, color: PdfColors.red800),
+              '* Lưu ý: Sinh viên chủ động theo dõi lịch học và có mặt trước giờ bắt đầu.',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
             ),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
-                pw.Text('XÁC NHẬN CỦA HỆ THỐNG', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                pw.Text('STUDYSNAP TIMETABLE', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
                 pw.SizedBox(height: 2),
-                pw.Text('(Đã ký số điện tử)', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                pw.Text('(Thời khóa biểu tự động)', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
               ],
             ),
           ],
