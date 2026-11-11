@@ -3,35 +3,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/l10n/strings.dart';
-
-// ── Model ──────────────────────────────────────────────────────────────────
-class _OcrResult {
-  final String text;
-  final int elapsedMs;
-  const _OcrResult(this.text, this.elapsedMs);
-}
-
-// ── Service ────────────────────────────────────────────────────────────────
-class _OcrService {
-  final _recognizer = TextRecognizer(script: TextRecognitionScript.latin);
-
-  Future<_OcrResult> recognize(String imagePath) async {
-    final sw = Stopwatch()..start();
-    final result =
-        await _recognizer.processImage(InputImage.fromFilePath(imagePath));
-    sw.stop();
-    return _OcrResult(result.text, sw.elapsedMilliseconds);
-  }
-
-  Future<void> close() => _recognizer.close();
-}
+import '../../../../core/utils/media_permission_helper.dart';
+import '../../../../core/utils/text_recognition_helper.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
-/// Màn hình OCR (CĐ 12): nhận diện chữ in từ ảnh (không cần mạng).
+/// Màn hình Đọc chữ từ ảnh: trích xuất văn bản từ ảnh bài giảng/viết tay.
 /// [onInsert] — callback chèn chữ vào vị trí con trỏ trong NoteEditorPage (FR-14).
 class OcrScannerPage extends StatefulWidget {
   final void Function(String text)? onInsert;
@@ -42,18 +21,11 @@ class OcrScannerPage extends StatefulWidget {
 }
 
 class _OcrScannerPageState extends State<OcrScannerPage> {
-  final _service = _OcrService();
   final _picker = ImagePicker();
   String? _imagePath;
-  _OcrResult? _result;
+  TextRecognitionResult? _result;
   bool _busy = false;
   String? _error;
-
-  @override
-  void dispose() {
-    _service.close();
-    super.dispose();
-  }
 
   Future<void> _pick(ImageSource source) async {
     if (kIsWeb) {
@@ -65,18 +37,42 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       return;
     }
 
-    final file = await _picker.pickImage(source: source);
-    if (file == null) {
+    if (source == ImageSource.camera) {
+      final hasPermission =
+          await MediaPermissionHelper.ensureCameraPermission(context);
+      if (!hasPermission || !mounted) return;
+    }
+
+    final XFile? file;
+    try {
+      file = await _picker.pickImage(source: source);
+    } catch (e) {
+      if (mounted) {
+        if (MediaPermissionHelper.isCameraDeniedError(e)) {
+          await MediaPermissionHelper.showCameraPermissionDialog(context);
+        } else {
+          setState(
+            () => _error = MediaPermissionHelper.formatMediaError(
+              e,
+              fallbackPrefix: 'Không thể chọn ảnh',
+            ),
+          );
+        }
+      }
       return;
     }
+    if (file == null || !mounted) {
+      return;
+    }
+    final imagePath = file.path;
     setState(() {
-      _imagePath = file.path;
+      _imagePath = imagePath;
       _result = null;
       _error = null;
       _busy = true;
     });
     try {
-      final r = await _service.recognize(file.path);
+      final r = await TextRecognitionHelper.extractFromImagePath(imagePath);
       if (mounted) {
         setState(() => _result = r);
       }
@@ -121,14 +117,14 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nhận diện chữ in ngoại tuyến (Offline OCR)',
+                        'Đọc chữ viết tay & tài liệu từ ảnh',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Sử dụng ML Kit xử lý trực tiếp trên thiết bị, không cần mạng internet',
+                        'Hoạt động cả khi mất mạng; tự tăng độ chuẩn dấu tiếng Việt khi có mạng & Trợ lý AI',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                           fontSize: 11.5,
@@ -262,8 +258,8 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                   children: [
                     const CircularProgressIndicator(),
                     const SizedBox(height: 12),
-                    Text(
-                      'Đang nhận diện văn bản bằng ML Kit...',
+                      Text(
+                      'Đang đọc nội dung văn bản từ ảnh...',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -314,18 +310,23 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.text_snippet_rounded, color: cs.primary, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Kết quả trích xuất',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.text_snippet_rounded, color: cs.primary, size: 20),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Kết quả trích xuất',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -359,7 +360,9 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
                       children: [
                         OutlinedButton.icon(
                           icon: const Icon(Icons.copy_rounded, size: 18),
@@ -375,8 +378,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                             );
                           },
                         ),
-                        if (widget.onInsert != null) ...[
-                          const SizedBox(width: 12),
+                        if (widget.onInsert != null)
                           FilledButton.icon(
                             icon: const Icon(Icons.check_rounded, size: 18),
                             onPressed: () {
@@ -385,7 +387,6 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                             },
                             label: const Text(AppStrings.ocrInsertToNote),
                           ),
-                        ],
                       ],
                     ),
                   ],

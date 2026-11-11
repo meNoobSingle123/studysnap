@@ -18,6 +18,9 @@ class KeyStorageService {
   static const String kPinLockoutUntilKey = 'pin_lockout_until_v1';
   static const String kReminderLeadMinutesKey = 'reminder_lead_minutes_v1';
   static const String kReminderEnabledKey = 'reminder_enabled_v1';
+  static const String kSchoolApiUrlKey = 'school_api_url_v1';
+  static const String kDefaultSchoolApiUrl =
+      String.fromEnvironment('SCHOOL_API_URL', defaultValue: '');
 
   final FlutterSecureStorage _storage;
 
@@ -280,6 +283,31 @@ class KeyStorageService {
         key: kReminderEnabledKey,
         value: enabled.toString(),
       );
+    } catch (_) {}
+  }
+
+  /// Lấy địa chỉ API máy chủ trường đã cấu hình (nếu có).
+  Future<String?> getSchoolApiUrl() async {
+    try {
+      final val = await _storage.read(key: kSchoolApiUrlKey);
+      if (val != null && val.trim().isNotEmpty) {
+        return val.trim();
+      }
+      return kDefaultSchoolApiUrl.isNotEmpty ? kDefaultSchoolApiUrl : null;
+    } catch (_) {
+      return kDefaultSchoolApiUrl.isNotEmpty ? kDefaultSchoolApiUrl : null;
+    }
+  }
+
+  /// Lưu địa chỉ API máy chủ trường.
+  Future<void> saveSchoolApiUrl(String url) async {
+    try {
+      final clean = url.trim();
+      if (clean.isEmpty) {
+        await _storage.delete(key: kSchoolApiUrlKey);
+      } else {
+        await _storage.write(key: kSchoolApiUrlKey, value: clean);
+      }
     } catch (_) {}
   }
 }

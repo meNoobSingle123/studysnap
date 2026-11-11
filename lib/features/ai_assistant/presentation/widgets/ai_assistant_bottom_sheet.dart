@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/media_permission_helper.dart';
+import '../../../../core/utils/text_recognition_helper.dart';
 import '../../../notes/domain/repositories/note_repository.dart';
 import '../bloc/ai_assistant_bloc.dart';
 import '../bloc/ai_assistant_event.dart';
@@ -103,15 +104,11 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
     }
   }
 
-  /// Nạp nhiều ảnh slide bài giảng và chạy OCR offline ghép thành nội dung bài học
+  /// Nạp nhiều ảnh slide bài giảng ở độ phân giải gốc để đọc chính xác không mất chữ
   Future<void> _pickSlideImages() async {
     try {
       final picker = ImagePicker();
-      final pickedFiles = await picker.pickMultiImage(
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
-      );
+      final pickedFiles = await picker.pickMultiImage();
       if (pickedFiles.isEmpty || !mounted) return;
 
       setState(() {
@@ -119,7 +116,6 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
         _ocrProgressText = 'Đang đọc slide 1/${pickedFiles.length}...';
       });
 
-      final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final buffer = StringBuffer();
 
       for (var i = 0; i < pickedFiles.length; i++) {
@@ -127,16 +123,15 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
         setState(() {
           _ocrProgressText = 'Đang đọc slide ${i + 1}/${pickedFiles.length}...';
         });
-        final visionImage = InputImage.fromFilePath(pickedFiles[i].path);
-        final recognizedText = await recognizer.processImage(visionImage);
-        final pageText = recognizedText.text.trim();
+        final extracted =
+            await TextRecognitionHelper.extractFromImagePath(pickedFiles[i].path);
+        final pageText = extracted.text.trim();
         if (pageText.isNotEmpty) {
           buffer.writeln('=== Trang Slide ${i + 1} ===');
           buffer.writeln(pageText);
           buffer.writeln();
         }
       }
-      await recognizer.close();
 
       if (!mounted) return;
       setState(() {
@@ -163,6 +158,7 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
         SnackBar(
           content: Text('Đã nạp ${pickedFiles.length} trang slide (${fullText.length} ký tự) vào AI.'),
           backgroundColor: Colors.teal,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
@@ -172,7 +168,15 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
           _ocrProgressText = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi nạp slide bài giảng: $e')),
+          SnackBar(
+            content: Text(
+              MediaPermissionHelper.formatMediaError(
+                e,
+                fallbackPrefix: 'Lỗi khi nạp slide bài giảng',
+              ),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -209,11 +213,13 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
                     children: [
                       const Icon(Icons.collections_bookmark_outlined, color: Color(0xFF5E48E8)),
                       const SizedBox(width: 8),
-                      Text(
-                        'Chọn bài học từ Thư viện (${notes.length})',
-                        style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                      Expanded(
+                        child: Text(
+                          'Chọn bài học từ Thư viện (${notes.length})',
+                          style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
                       ),
                     ],
                   ),
@@ -265,36 +271,38 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
   }
 
   Future<void> _scanDocumentOcr(ImageSource source) async {
+    if (source == ImageSource.camera) {
+      final hasPermission =
+          await MediaPermissionHelper.ensureCameraPermission(context);
+      if (!hasPermission || !mounted) return;
+    }
+
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: source,
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
-      );
+      final picked = await picker.pickImage(source: source);
       if (picked == null || !mounted) return;
 
       setState(() => _isOcrProcessing = true);
 
-      final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final visionImage = InputImage.fromFilePath(picked.path);
-      final recognizedText = await recognizer.processImage(visionImage);
-      await recognizer.close();
+      final extracted =
+          await TextRecognitionHelper.extractFromImagePath(picked.path);
 
       if (!mounted) return;
       setState(() => _isOcrProcessing = false);
 
-      final text = recognizedText.text.trim();
+      final text = extracted.text.trim();
       if (text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không nhận diện được chữ trong ảnh.')),
+          const SnackBar(
+            content: Text('Không nhận diện được chữ trong ảnh.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         return;
       }
 
       setState(() {
-        _currentTitle = 'Tài liệu quét ảnh OCR';
+        _currentTitle = 'Văn bản đọc từ ảnh';
         _currentContent = text;
       });
 
@@ -302,16 +310,33 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đã nhận diện ${text.length} ký tự từ ảnh và nạp vào AI.'),
+          content: Text(
+            extracted.usedAiVision
+                ? 'Đã đọc chuẩn ${text.length} ký tự (AI Vision) và nạp vào Trợ lý.'
+                : 'Đã đọc ${text.length} ký tự từ ảnh và nạp vào Trợ lý.',
+          ),
           backgroundColor: Colors.teal,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
       if (mounted) {
         setState(() => _isOcrProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi quét ảnh OCR: $e')),
-        );
+        if (MediaPermissionHelper.isCameraDeniedError(e)) {
+          await MediaPermissionHelper.showCameraPermissionDialog(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                MediaPermissionHelper.formatMediaError(
+                  e,
+                  fallbackPrefix: 'Lỗi khi đọc chữ từ ảnh',
+                ),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -472,7 +497,7 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
                 ),
               ),
 
-              // ── Thanh Chọn Nguồn Tài liệu (Slide / Quét ảnh OCR / Thư viện / Sửa dán) ─
+              // ── Thanh Chọn Nguồn Tài liệu (Slide / Đọc chữ từ ảnh / Thư viện / Sửa dán) ─
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: SizedBox(
@@ -494,7 +519,7 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
                       ActionChip(
                         avatar: const Icon(Icons.document_scanner_outlined, size: 16, color: Colors.teal),
                         label: Text(
-                          _isOcrProcessing && _ocrProgressText == null ? 'Đang quét...' : 'Quét ảnh OCR',
+                          _isOcrProcessing && _ocrProgressText == null ? 'Đang đọc chữ...' : 'Đọc chữ từ ảnh',
                           style: const TextStyle(fontSize: 11.5),
                         ),
                         visualDensity: VisualDensity.compact,
@@ -551,25 +576,45 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
               // ── Segmented Control (Tóm tắt / Trắc nghiệm) ───────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: SegmentedButton<int>(
-                  segments: const [
-                    ButtonSegment(
-                      value: 0,
-                      icon: Icon(Icons.notes_rounded),
-                      label: Text('Tóm tắt bài học'),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<int>(
+                    showSelectedIcon: false,
+                    style: SegmentedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      textStyle: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    ButtonSegment(
-                      value: 1,
-                      icon: Icon(Icons.quiz_outlined),
-                      label: Text('Câu hỏi trắc nghiệm'),
-                    ),
-                  ],
-                  selected: {_selectedTab},
-                  onSelectionChanged: (set) {
-                    final newTab = set.first;
-                    setState(() => _selectedTab = newTab);
-                    _triggerAnalysis();
-                  },
+                    segments: const [
+                      ButtonSegment(
+                        value: 0,
+                        icon: Icon(Icons.notes_rounded, size: 17),
+                        label: Text(
+                          'Tóm tắt bài học',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ButtonSegment(
+                        value: 1,
+                        icon: Icon(Icons.quiz_outlined, size: 17),
+                        label: Text(
+                          'Trắc nghiệm',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    selected: {_selectedTab},
+                    onSelectionChanged: (set) {
+                      final newTab = set.first;
+                      setState(() => _selectedTab = newTab);
+                      _triggerAnalysis();
+                    },
+                  ),
                 ),
               ),
 
@@ -646,10 +691,12 @@ class _AiAssistantBottomSheetState extends State<AiAssistantBottomSheet> {
             children: [
               Icon(Icons.key_rounded, color: colorScheme.primary, size: 28),
               const SizedBox(width: 10),
-              Text(
-                'Cấu hình Khóa API AI',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  'Cấu hình Khóa API AI',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],

@@ -14,9 +14,13 @@ class CompressLectureImageUseCase {
     int quality = 75,
   }) async {
     try {
-      final tempDir = await getTemporaryDirectory();
+      final docsDir = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory('${docsDir.path}${Platform.pathSeparator}note_images');
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
       final targetPath =
-          '${tempDir.path}/compressed_${DateTime.now().microsecondsSinceEpoch}.jpg';
+          '${imagesDir.path}${Platform.pathSeparator}compressed_${DateTime.now().microsecondsSinceEpoch}.jpg';
 
       final compressedXFile = await FlutterImageCompress.compressAndGetFile(
         sourceFile.path,

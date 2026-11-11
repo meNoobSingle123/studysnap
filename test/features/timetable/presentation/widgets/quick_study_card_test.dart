@@ -60,7 +60,7 @@ void main() {
       expect(find.text('Bắt đầu sau 25 phút'), findsOneWidget);
       expect(find.text('2 ca học hôm nay'), findsOneWidget);
       expect(find.text('Ghi chép ngay'), findsOneWidget);
-      expect(find.text('Quét bảng OCR'), findsOneWidget);
+      expect(find.text('Đọc chữ từ ảnh'), findsOneWidget);
     });
 
     testWidgets('renders empty state when no classes today', (tester) async {

@@ -24,14 +24,16 @@ class Subject {
 
   /// Điểm chữ quy đổi theo thang điểm đại học
   String? get letterGrade {
-    if (gradePoint == null) return null;
-    if (gradePoint! >= 3.8) return 'A+';
-    if (gradePoint! >= 3.5) return 'A';
-    if (gradePoint! >= 3.0) return 'B+';
-    if (gradePoint! >= 2.5) return 'B';
-    if (gradePoint! >= 2.0) return 'C+';
-    if (gradePoint! >= 1.5) return 'C';
-    if (gradePoint! >= 1.0) return 'D';
+    final point = gradePoint;
+    if (point == null) return null;
+    if (point >= 3.85) return 'A+';
+    if (point >= 3.6) return 'A';
+    if (point >= 3.25) return 'B+';
+    if (point >= 2.75) return 'B';
+    if (point >= 2.25) return 'C+';
+    if (point >= 1.75) return 'C';
+    if (point >= 1.25) return 'D+';
+    if (point >= 0.75) return 'D';
     return 'F';
   }
 

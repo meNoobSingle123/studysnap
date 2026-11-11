@@ -404,7 +404,9 @@ Future<Uint8List> _notePdfIsolateEntry(_NoteIsolateParams params) async {
               ),
               pw.SizedBox(height: 6),
               pw.Text(
-                note.title,
+                note.title.trim().isNotEmpty
+                    ? note.title
+                    : AppStrings.notePdfHeader,
                 style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
               ),
               pw.SizedBox(height: 12),
@@ -422,15 +424,19 @@ Future<Uint8List> _notePdfIsolateEntry(_NoteIsolateParams params) async {
           ),
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Môn học: ${sub?.name ?? 'Không xác định'}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 3),
-                  pw.Text('Mã học phần: ${sub?.code ?? '-'} (${sub?.credits ?? 0} tín chỉ)', style: const pw.TextStyle(fontSize: 9)),
-                ],
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Môn học: ${sub?.name ?? 'Không xác định'}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 3),
+                    pw.Text('Mã học phần: ${sub?.code ?? '-'} (${sub?.credits ?? 0} tín chỉ)', style: const pw.TextStyle(fontSize: 9)),
+                  ],
+                ),
               ),
+              pw.SizedBox(width: 12),
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [

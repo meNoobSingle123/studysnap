@@ -91,11 +91,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Future<void> _completeOnboarding() async {
+    final wasCompleted = AppOnboardingListenable.instance.isCompleted;
     await _keyStorage.setOnboardingCompleted(true);
     AppOnboardingListenable.instance.setCompleted(true);
     if (mounted) {
       try {
-        context.go(Routes.timetable);
+        if (wasCompleted && context.canPop()) {
+          context.pop();
+        } else {
+          context.go(Routes.timetable);
+        }
       } catch (_) {
         Navigator.of(context).maybePop();
       }
@@ -116,10 +121,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
       badge: 'GHI CHÉP ĐA PHƯƠNG TIỆN',
       title: 'Ghi chú bài giảng & Nét vẽ Vector',
       description:
-          'Viết vẽ trên Canvas vector mượt mà, quét nhận diện chữ bảng viết bằng AI OCR không cần mạng, và xem video bài giảng với Split-View tiện lợi.',
+          'Viết vẽ trên Canvas vector mượt mà, chụp và đọc chữ từ bảng viết hay tài liệu không cần mạng, cùng video bài giảng Split-View tiện lợi.',
       icon: Icons.draw_rounded,
       highlightColor: Color(0xFF00897B),
-      pills: ['Canvas vector mượt', 'OCR quét bảng offline', 'Video Split-View'],
+      pills: ['Canvas vector mượt', 'Đọc chữ từ ảnh', 'Video Split-View'],
     ),
     _OnboardingItem(
       badge: 'TRÍ TUỆ NHÂN TẠO & XUẤT BẢN',

@@ -15,6 +15,7 @@ import '../../../ai_assistant/presentation/widgets/ai_assistant_bottom_sheet.dar
 import '../../data/repositories/in_memory_note_repository.dart';
 import '../../domain/entities/lecture_note.dart';
 import '../../domain/repositories/note_repository.dart';
+import '../../domain/utils/note_filter_helper.dart';
 import '../bloc/note_list_bloc.dart';
 import '../bloc/note_list_event.dart';
 import '../bloc/note_list_state.dart';
@@ -120,7 +121,7 @@ class _NotesPageState extends State<NotesPage> {
                         ),
                         const SizedBox(height: 20),
                         FilledButton.icon(
-                          onPressed: () => context.push(Routes.noteEditor),
+                          onPressed: () => _openNoteEditor(const Uuid().v4()),
                           icon: const Icon(Icons.add_rounded, size: 18),
                           label: const Text('Tạo ghi chú mới'),
                         ),
@@ -301,7 +302,43 @@ class _NoteListViewState extends State<_NoteListView> {
     }
   }
 
-  void _openAiAssistant(BuildContext context, List<LectureNote> notes) {
+  String _resolveDisplaySubjectName(
+    LectureNote note,
+    Map<String, Subject> subjectsMap,
+  ) {
+    final resolved =
+        NoteFilterHelper.resolveSubject(note.subjectId, subjectsMap);
+    if (resolved != null && resolved.name.isNotEmpty) {
+      return resolved.name;
+    }
+    if (NoteFilterHelper.isGeneralSubjectId(note.subjectId)) {
+      return 'Chung';
+    }
+    return note.subjectId;
+  }
+
+  List<String> _extractCustomSubjects(NoteListState state) {
+    final seen = <String>{};
+    final result = <String>[];
+    for (final note in state.allNotes) {
+      if (NoteFilterHelper.isGeneralSubjectId(note.subjectId)) continue;
+      if (NoteFilterHelper.resolveSubject(note.subjectId, state.subjectsMap) !=
+          null) {
+        continue;
+      }
+      final key = note.subjectId.trim().toLowerCase();
+      if (seen.add(key)) {
+        result.add(note.subjectId.trim());
+      }
+    }
+    return result;
+  }
+
+  void _openAiAssistant(
+    BuildContext context,
+    List<LectureNote> notes,
+    Map<String, Subject> subjectsMap,
+  ) {
     if (notes.isEmpty) {
       AiAssistantBottomSheet.show(
         context: context,
@@ -321,7 +358,7 @@ class _NoteListViewState extends State<_NoteListView> {
         noteContent: note.bodyText.isNotEmpty
             ? note.bodyText
             : 'Bài giảng chưa có nội dung văn bản.',
-        subjectName: note.subjectId,
+        subjectName: _resolveDisplaySubjectName(note, subjectsMap),
       );
       return;
     }
@@ -344,11 +381,13 @@ class _NoteListViewState extends State<_NoteListView> {
                   children: [
                     const Icon(Icons.auto_awesome_rounded, color: Color(0xFF5E48E8)),
                     const SizedBox(width: 8),
-                    Text(
-                      'Chọn bài giảng để AI phân tích',
-                      style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                    Expanded(
+                      child: Text(
+                        'Chọn bài giảng để AI phân tích',
+                        style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
                     ),
                   ],
                 ),
@@ -384,7 +423,7 @@ class _NoteListViewState extends State<_NoteListView> {
                           noteContent: n.bodyText.isNotEmpty
                               ? n.bodyText
                               : 'Bài giảng ${n.title}',
-                          subjectName: n.subjectId,
+                          subjectName: _resolveDisplaySubjectName(n, subjectsMap),
                         );
                       },
                     );
@@ -439,304 +478,387 @@ class _NoteListViewState extends State<_NoteListView> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 1. Search Box
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: AppStrings.searchNotesHint,
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded),
-                        onPressed: () {
-                          _searchController.clear();
-                          context
-                              .read<NoteListBloc>()
-                              .add(const SearchQueryChanged(''));
-                          setState(() {});
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              onChanged: (query) {
-                context.read<NoteListBloc>().add(SearchQueryChanged(query));
-                setState(() {});
-              },
-            ),
-          ),
-
-          // 2. Filter Bar (Subjects & Date)
-          BlocBuilder<NoteListBloc, NoteListState>(
-            builder: (context, state) {
-              return SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    // "All Subjects" chip
-                    ChoiceChip(
-                      label: const Text(AppStrings.allSubjects),
-                      selected: state.selectedSubjectId == null,
-                      onSelected: (selected) {
-                        if (selected) {
-                          context
-                              .read<NoteListBloc>()
-                              .add(const FilterSubjectChanged(null));
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Subjects chips
-                    ...state.subjectsMap.values.map((subject) {
-                      final isSelected = state.selectedSubjectId == subject.id;
-                      final color = Color(subject.colorArgb);
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          avatar: CircleAvatar(
-                            backgroundColor: color,
-                            radius: 6,
-                          ),
-                          label: Text(subject.name),
-                          selected: isSelected,
-                          onSelected: (_) {
+      body: BlocListener<NoteListBloc, NoteListState>(
+        listenWhen: (prev, curr) =>
+            prev.searchQuery != curr.searchQuery && curr.searchQuery.isEmpty,
+        listener: (context, state) {
+          if (_searchController.text.isNotEmpty) {
+            _searchController.clear();
+            setState(() {});
+          }
+        },
+        child: Column(
+          children: [
+            // 1. Search Box
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: AppStrings.searchNotesHint,
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: () {
+                            _searchController.clear();
                             context
                                 .read<NoteListBloc>()
-                                .add(FilterSubjectChanged(subject.id));
+                                .add(const SearchQueryChanged(''));
+                            setState(() {});
                           },
-                        ),
-                      );
-                    }),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                onChanged: (query) {
+                  context.read<NoteListBloc>().add(SearchQueryChanged(query));
+                  setState(() {});
+                },
+              ),
+            ),
 
-                    // Date filter chip
-                    if (state.selectedDate == null)
-                      ActionChip(
-                        avatar: const Icon(Icons.calendar_today_outlined, size: 16),
-                        label: const Text(AppStrings.filterByDate),
-                        onPressed: _pickDate,
-                      )
-                    else
-                      InputChip(
-                        avatar: const Icon(Icons.calendar_today, size: 16),
-                        label: Text(
-                          '${state.selectedDate!.day.toString().padLeft(2, '0')}/${state.selectedDate!.month.toString().padLeft(2, '0')}/${state.selectedDate!.year}',
-                        ),
-                        selected: true,
-                        onDeleted: () {
-                          context
-                              .read<NoteListBloc>()
-                              .add(const FilterDateChanged(null));
+            // 2. Filter Bar (Subjects & Date)
+            BlocBuilder<NoteListBloc, NoteListState>(
+              builder: (context, state) {
+                final customSubjects = _extractCustomSubjects(state);
+                final hasGeneralNotes = state.allNotes.any(
+                  (n) => NoteFilterHelper.isGeneralSubjectId(n.subjectId),
+                );
+
+                return SizedBox(
+                  height: 44,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      // "All Subjects" chip
+                      ChoiceChip(
+                        label: const Text(AppStrings.allSubjects),
+                        selected: state.selectedSubjectId == null,
+                        onSelected: (_) {
+                          if (state.selectedSubjectId != null) {
+                            context
+                                .read<NoteListBloc>()
+                                .add(const FilterSubjectChanged(null));
+                          }
                         },
                       ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 6),
+                      const SizedBox(width: 8),
 
-          // 2.5 Thẻ Trợ lý AI Gemini Học tập (AI Study Hub)
-          BlocBuilder<NoteListBloc, NoteListState>(
-            builder: (context, state) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.25),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Trợ lý Học tập AI',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
-                              ),
+                      // Timetable subjects chips
+                      ...state.subjectsMap.values.map((subject) {
+                        final isSelected = state.selectedSubjectId == subject.id;
+                        final color = Color(subject.colorArgb);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: CircleAvatar(
+                              backgroundColor: color,
+                              radius: 6,
                             ),
-                            Text(
-                              'Tóm tắt bài học & Tạo trắc nghiệm ôn thi',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
+                            label: Text(subject.name),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              context
+                                  .read<NoteListBloc>()
+                                  .add(FilterSubjectChanged(subject.id));
+                            },
+                          ),
+                        );
+                      }),
+
+                      // Custom subjects chips (user-entered subject tags not in timetable)
+                      ...customSubjects.map((customName) {
+                        final isSelected = state.selectedSubjectId == customName;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            avatar: const CircleAvatar(
+                              radius: 6,
+                              child: Icon(Icons.label_outline, size: 10),
                             ),
-                          ],
-                        ),
-                      ),
-                      FilledButton.tonal(
-                        style: FilledButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            label: Text(customName),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              context
+                                  .read<NoteListBloc>()
+                                  .add(FilterSubjectChanged(customName));
+                            },
+                          ),
+                        );
+                      }),
+
+                      // "Chung" chip for notes without an assigned timetable subject
+                      if (hasGeneralNotes)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: const Text('Chung'),
+                            selected: state.selectedSubjectId ==
+                                NoteFilterHelper.generalSubjectFilterId,
+                            onSelected: (_) {
+                              context.read<NoteListBloc>().add(
+                                    const FilterSubjectChanged(
+                                      NoteFilterHelper.generalSubjectFilterId,
+                                    ),
+                                  );
+                            },
                           ),
                         ),
-                        onPressed: () => _openAiAssistant(context, state.allNotes),
-                        child: const Text('Mở AI ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
+
+                      // Date filter chip
+                      if (state.selectedDate == null)
+                        ActionChip(
+                          avatar: const Icon(Icons.calendar_today_outlined, size: 16),
+                          label: const Text(AppStrings.filterByDate),
+                          onPressed: _pickDate,
+                        )
+                      else
+                        InputChip(
+                          avatar: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(
+                            '${state.selectedDate!.day.toString().padLeft(2, '0')}/${state.selectedDate!.month.toString().padLeft(2, '0')}/${state.selectedDate!.year}',
+                          ),
+                          selected: true,
+                          onDeleted: () {
+                            context
+                                .read<NoteListBloc>()
+                                .add(const FilterDateChanged(null));
+                          },
+                        ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
+                );
+              },
+            ),
+            const SizedBox(height: 6),
 
-          // 3. Notes List or Empty View
-          Expanded(
-            child: BlocBuilder<NoteListBloc, NoteListState>(
+            // 2.5 Thẻ Trợ lý AI Học tập (AI Study Hub)
+            BlocBuilder<NoteListBloc, NoteListState>(
               builder: (context, state) {
-                if (state.status == NoteListStatus.loading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (state.status == NoteListStatus.failure) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(
-                          Icons.error_outline_rounded,
-                          size: 48,
-                          color: theme.colorScheme.error,
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          state.errorMessage ?? AppStrings.cannotLoadNotes,
-                          style: theme.textTheme.bodyLarge,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Trợ lý Học tập AI',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              Text(
+                                'Tóm tắt bài học & Tạo trắc nghiệm ôn thi',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        FilledButton.tonal(
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () => _openAiAssistant(
+                            context,
+                            state.allNotes,
+                            state.subjectsMap,
+                          ),
+                          child: const Text('Mở AI ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ],
                     ),
-                  );
-                }
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
 
-                if (state.filteredNotes.isEmpty) {
-                  final isFiltering = state.searchQuery.isNotEmpty ||
-                      state.selectedSubjectId != null ||
-                      state.selectedDate != null;
+            // 3. Notes List or Empty View
+            Expanded(
+              child: BlocBuilder<NoteListBloc, NoteListState>(
+                builder: (context, state) {
+                  if (state.status == NoteListStatus.loading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  return Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
+                  if (state.status == NoteListStatus.failure) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            isFiltering
-                                ? Icons.filter_list_off_rounded
-                                : Icons.note_alt_outlined,
-                            size: 64,
-                            color: theme.colorScheme.outlineVariant,
+                            Icons.error_outline_rounded,
+                            size: 48,
+                            color: theme.colorScheme.error,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           Text(
-                            isFiltering
-                                ? AppStrings.noMatchingNotes
-                                : AppStrings.emptyNotesList,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
+                            state.errorMessage ?? AppStrings.cannotLoadNotes,
+                            style: theme.textTheme.bodyLarge,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            isFiltering
-                                ? 'Thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc'
-                                : 'Nhấn nút "+" bên dưới để tạo ghi chú bài giảng đầu tiên',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (!isFiltering) ...[
-                            const SizedBox(height: 20),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 8,
-                              alignment: WrapAlignment.center,
-                              children: [
-                                FilledButton.icon(
-                                  key: const ValueKey('empty_create_note_btn'),
-                                  onPressed: () => context.push(Routes.noteEditor),
-                                  icon: const Icon(Icons.add_rounded, size: 18),
-                                  label: const Text('Tạo ghi chú mới'),
-                                ),
-                                OutlinedButton.icon(
-                                  key: const ValueKey('empty_scan_slide_btn'),
-                                  onPressed: () => context.push(Routes.scanner),
-                                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                                  label: const Text('Chụp slide bài học'),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
                       ),
-                    ),
-                  );
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                  itemCount: state.filteredNotes.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final note = state.filteredNotes[index];
-                    final subject = state.subjectsMap[note.subjectId];
-
-                    return _NoteCard(
-                      note: note,
-                      subject: subject,
-                      onTap: () async {
-                        await context.push(Routes.noteEdit(note.id));
-                        if (context.mounted) {
-                          context.read<NoteListBloc>().add(const LoadNotesStarted());
-                        }
-                      },
-                      onDelete: () => _confirmDelete(context, note.id),
                     );
-                  },
-                );
-              },
+                  }
+
+                  if (state.filteredNotes.isEmpty) {
+                    final isFiltering = state.searchQuery.trim().isNotEmpty ||
+                        state.selectedSubjectId != null ||
+                        state.selectedDate != null;
+
+                    return Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isFiltering
+                                  ? Icons.filter_list_off_rounded
+                                  : Icons.note_alt_outlined,
+                              size: 64,
+                              color: theme.colorScheme.outlineVariant,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              isFiltering
+                                  ? AppStrings.noMatchingNotes
+                                  : AppStrings.emptyNotesList,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              isFiltering
+                                  ? 'Thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc'
+                                  : 'Nhấn nút "+" bên dưới để tạo ghi chú bài giảng đầu tiên',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (isFiltering) ...[
+                              const SizedBox(height: 20),
+                              FilledButton.tonalIcon(
+                                key: const ValueKey('clear_filters_btn'),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  context
+                                      .read<NoteListBloc>()
+                                      .add(const ClearFiltersRequested());
+                                  setState(() {});
+                                },
+                                icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                                label: const Text('Xóa bộ lọc'),
+                              ),
+                            ] else ...[
+                              const SizedBox(height: 20),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  FilledButton.icon(
+                                    key: const ValueKey('empty_create_note_btn'),
+                                    onPressed: () async {
+                                      final newNoteId = const Uuid().v4();
+                                      await context.push(Routes.noteEdit(newNoteId));
+                                      if (context.mounted) {
+                                        context
+                                            .read<NoteListBloc>()
+                                            .add(const LoadNotesStarted());
+                                      }
+                                    },
+                                    icon: const Icon(Icons.add_rounded, size: 18),
+                                    label: const Text('Tạo ghi chú mới'),
+                                  ),
+                                  OutlinedButton.icon(
+                                    key: const ValueKey('empty_scan_slide_btn'),
+                                    onPressed: () => context.push(Routes.scanner),
+                                    icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                                    label: const Text('Chụp slide bài học'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                    itemCount: state.filteredNotes.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final note = state.filteredNotes[index];
+                      final subject = NoteFilterHelper.resolveSubject(
+                        note.subjectId,
+                        state.subjectsMap,
+                      );
+
+                      return _NoteCard(
+                        note: note,
+                        subject: subject,
+                        onTap: () async {
+                          await context.push(Routes.noteEdit(note.id));
+                          if (context.mounted) {
+                            context.read<NoteListBloc>().add(const LoadNotesStarted());
+                          }
+                        },
+                        onDelete: () => _confirmDelete(context, note.id),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -814,11 +936,12 @@ class _NoteCard extends StatelessWidget {
 
     // Làm sạch tiêu đề nếu trước đó lưu chuỗi UUID thô
     final rawTitle = note.title.trim();
+    final rawUuidTitleRegex = RegExp(
+      r'^Ghi chú:\s*[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
     final cleanTitle = rawTitle.isEmpty
         ? AppStrings.untitledNote
-        : (rawTitle.startsWith('Ghi chú:') &&
-                rawTitle.contains('-') &&
-                rawTitle.length > 25
+        : (rawUuidTitleRegex.hasMatch(rawTitle)
             ? (subject?.name.isNotEmpty == true
                 ? 'Ghi chú: ${subject!.name}'
                 : 'Ghi chú bài giảng')

@@ -148,5 +148,29 @@ void main() {
         ),
       );
     });
+
+    test('CapturePhotoRequested emits friendly camera message when permission is permanently denied',
+        () async {
+      final deniedBloc = ScannerBloc(
+        parseQrCodeUseCase: parseQrCodeUseCase,
+        compressLectureImageUseCase: compressLectureImageUseCase,
+        checkPermission: () async => PermissionStatus.permanentlyDenied,
+        requestPermission: () async => PermissionStatus.permanentlyDenied,
+      );
+
+      deniedBloc.add(const CapturePhotoRequested());
+
+      await expectLater(
+        deniedBloc.stream,
+        emitsThrough(
+          predicate<ScannerState>((state) =>
+              !state.isProcessing &&
+              !state.hasCameraPermission &&
+              state.errorMessage != null &&
+              state.errorMessage!.contains('Cài đặt')),
+        ),
+      );
+      await deniedBloc.close();
+    });
   });
 }

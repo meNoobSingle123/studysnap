@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 
 import '../../../notes/domain/entities/lecture_note.dart';
 import '../../../notes/domain/repositories/note_repository.dart';
+import '../../../notes/domain/utils/note_filter_helper.dart';
 import '../../../timetable/domain/entities/subject.dart';
 import '../../../timetable/domain/entities/timetable_slot.dart';
 import '../../../timetable/domain/repositories/timetable_repository.dart';
@@ -50,16 +51,26 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
       }
 
       final orientation = PdfOrientation.portrait;
-      final result = await _renderDocument(
-        type: event.type,
-        orientation: orientation,
-        timetableData: timetableData,
-        noteData: noteData,
-      );
+      final effectiveType =
+          (event.type == PdfExportType.note && noteData == null)
+              ? PdfExportType.note
+              : event.type;
+      final result = (effectiveType == PdfExportType.note && noteData == null)
+          ? PdfRenderResult(
+              bytes: Uint8List(0),
+              durationMs: 0,
+              sizeBytes: 0,
+            )
+          : await _renderDocument(
+              type: effectiveType,
+              orientation: orientation,
+              timetableData: timetableData,
+              noteData: noteData,
+            );
 
       emit(PdfExportLoaded(
         result: result,
-        exportType: event.type,
+        exportType: effectiveType,
         orientation: orientation,
         selectedNoteId: targetNoteId,
         availableNotes: allNotes,
@@ -79,21 +90,32 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
     try {
       NoteExportData? noteData = current.currentNoteData;
       String? noteId = event.noteId ?? current.selectedNoteId;
-
-      if (event.type == PdfExportType.note && noteData == null && noteId != null) {
-        noteData = await _buildNoteExportData(
-          noteId,
-          current.availableNotes,
-          current.timetableData?.subjects ?? [],
-        );
+      if (noteId == null && current.availableNotes.isNotEmpty) {
+        noteId = current.availableNotes.first.id;
       }
 
-      final result = await _renderDocument(
-        type: event.type,
-        orientation: current.orientation,
-        timetableData: current.timetableData,
-        noteData: noteData,
-      );
+      if (event.type == PdfExportType.note && noteId != null) {
+        if (noteData == null || noteData.note.id != noteId) {
+          noteData = await _buildNoteExportData(
+            noteId,
+            current.availableNotes,
+            current.timetableData?.subjects ?? [],
+          );
+        }
+      }
+
+      final result = (event.type == PdfExportType.note && noteData == null)
+          ? PdfRenderResult(
+              bytes: Uint8List(0),
+              durationMs: 0,
+              sizeBytes: 0,
+            )
+          : await _renderDocument(
+              type: event.type,
+              orientation: current.orientation,
+              timetableData: current.timetableData,
+              noteData: noteData,
+            );
 
       emit(current.copyWith(
         result: result,
@@ -114,6 +136,14 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
     final current = state;
     if (current is! PdfExportLoaded) return;
     if (current.orientation == event.orientation) return;
+
+    if (current.exportType == PdfExportType.note && current.currentNoteData == null) {
+      emit(current.copyWith(
+        orientation: event.orientation,
+        clearActionFeedback: true,
+      ));
+      return;
+    }
 
     emit(const PdfExportLoading(message: 'Đang định dạng lại khổ giấy...'));
     try {
@@ -256,12 +286,12 @@ class PdfExportBloc extends Bloc<PdfExportEvent, PdfExportState> {
     }
     if (targetNote == null) return null;
 
-    Subject? matchedSubject;
-    try {
-      matchedSubject = subjects.firstWhere((s) => s.id == targetNote!.subjectId);
-    } catch (_) {
-      matchedSubject = await timetableRepository.getSubjectById(targetNote.subjectId);
-    }
+    final subjectsMap = {for (final s in subjects) s.id: s};
+    Subject? matchedSubject = NoteFilterHelper.resolveSubject(
+      targetNote.subjectId,
+      subjectsMap,
+    );
+    matchedSubject ??= await timetableRepository.getSubjectById(targetNote.subjectId);
 
     TimetableSlot? matchedSlot;
     if (targetNote.slotId != null) {

@@ -3,13 +3,16 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/l10n/strings.dart';
+import '../../../../core/router/routes.dart';
+import '../../../../core/utils/media_permission_helper.dart';
 import '../../domain/entities/stroke.dart';
 import '../../domain/repositories/note_repository.dart';
 import '../bloc/canvas_bloc.dart';
@@ -18,6 +21,7 @@ import '../bloc/canvas_state.dart';
 import '../utils/canvas_image_exporter.dart';
 import '../widgets/canvas/canvas_drawing_board.dart';
 import '../widgets/canvas/canvas_toolbar.dart';
+import 'note_editor_page.dart';
 
 /// Màn hình vẽ và chú thích trên canvas S07 theo đặc tả CĐ 7 (mục 5.2, 5.3, 6.2).
 /// Hỗ trợ vẽ nét bút/highlight, tẩy xóa, undo/redo, xuất ảnh độ phân giải gốc.
@@ -135,7 +139,15 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
     );
   }
 
+  bool get _isStandaloneSketch => widget.noteId == null && widget.onSave == null;
+
   Future<void> _pickImageFromSource(ImageSource source) async {
+    if (source == ImageSource.camera) {
+      final hasPermission =
+          await MediaPermissionHelper.ensureCameraPermission(context);
+      if (!hasPermission || !mounted) return;
+    }
+
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -155,9 +167,21 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể nạp ảnh: $e')),
-        );
+        if (MediaPermissionHelper.isCameraDeniedError(e)) {
+          await MediaPermissionHelper.showCameraPermissionDialog(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                MediaPermissionHelper.formatMediaError(
+                  e,
+                  fallbackPrefix: 'Không thể nạp ảnh',
+                ),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -172,9 +196,13 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
         } catch (_) {}
       }
 
+      final exportSize = baseUiImage != null
+          ? Size(baseUiImage.width.toDouble(), baseUiImage.height.toDouble())
+          : widget.originalImageSize;
+
       final bytes = await CanvasImageExporter.exportToBytes(
         strokes: state.strokes,
-        targetSize: widget.originalImageSize,
+        targetSize: exportSize,
         baseImage: baseUiImage,
       );
 
@@ -182,8 +210,13 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
       if (bytes != null) {
         try {
           final docsDir = await getApplicationDocumentsDirectory();
+          final sep = Platform.pathSeparator;
+          final imagesDir = Directory('${docsDir.path}${sep}note_images');
+          if (!await imagesDir.exists()) {
+            await imagesDir.create(recursive: true);
+          }
           final fileName = 'canvas_${const Uuid().v4()}.png';
-          final file = File('${docsDir.path}/$fileName');
+          final file = File('${imagesDir.path}$sep$fileName');
           await file.writeAsBytes(bytes, flush: true);
           savedPath = file.path;
 
@@ -211,6 +244,30 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
         setState(() {
           _hasUnsavedChanges = false;
         });
+
+        if (_isStandaloneSketch && savedPath != null) {
+          final newNoteId = const Uuid().v4();
+          final router = GoRouter.maybeOf(context);
+          if (router != null) {
+            router.pushReplacement(
+              Routes.noteEdit(newNoteId),
+              extra: {
+                'initialImagePaths': [savedPath],
+              },
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => NoteEditorPage(
+                  noteId: newNoteId,
+                  initialImagePaths: [savedPath!],
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.canvasExportSuccess)),
         );
@@ -274,7 +331,11 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
           },
           child: Scaffold(
             appBar: AppBar(
-              title: const Text(AppStrings.canvasPageTitle),
+              title: Text(
+                _isStandaloneSketch
+                    ? 'Bảng vẽ phác thảo'
+                    : AppStrings.canvasPageTitle,
+              ),
               leading: const BackButton(),
               actions: [
                 IconButton(
@@ -294,10 +355,19 @@ class _CanvasPageViewState extends State<_CanvasPageView> {
                     ),
                   )
                 else
-                  TextButton.icon(
-                    onPressed: () => _handleSave(state),
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text(AppStrings.save),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _isStandaloneSketch
+                        ? FilledButton.tonalIcon(
+                            onPressed: () => _handleSave(state),
+                            icon: const Icon(Icons.note_add_outlined, size: 18),
+                            label: const Text('Tạo ghi chú'),
+                          )
+                        : TextButton.icon(
+                            onPressed: () => _handleSave(state),
+                            icon: const Icon(Icons.check_rounded),
+                            label: const Text(AppStrings.save),
+                          ),
                   ),
               ],
             ),

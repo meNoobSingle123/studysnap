@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nhom_7/features/notes/domain/utils/note_filter_helper.dart';
 import 'package:nhom_7/features/notes/domain/utils/timestamp_helper.dart';
+import 'package:nhom_7/features/timetable/domain/entities/subject.dart';
 import 'package:nhom_7/features/timetable/domain/repositories/timetable_repository.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../../../core/utils/media_permission_helper.dart';
 import '../../../ai_assistant/presentation/widgets/ai_assistant_bottom_sheet.dart';
 import '../../../ocr/ocr_scanner_page.dart';
 import '../bloc/note_editor_bloc.dart';
@@ -127,7 +130,7 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
         final hasChanges = state.hasUnsavedChanges ||
             _titleController.text != state.note.title ||
             _bodyController.text != state.note.bodyText;
-        if (hasChanges && !state.isSaving) {
+        if (hasChanges) {
           final noteToSave = state.note.copyWith(
             title: _titleController.text,
             bodyText: _bodyController.text,
@@ -180,14 +183,11 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
       if (getIt.isRegistered<TimetableRepository>()) {
         final repo = getIt<TimetableRepository>();
         String? foundSubjectName;
-        if (subjectId.isNotEmpty && subjectId != 'general') {
+        if (!NoteFilterHelper.isGeneralSubjectId(subjectId)) {
           final subjects = await repo.getSubjects();
-          for (final s in subjects) {
-            if (s.id == subjectId || s.name == subjectId) {
-              foundSubjectName = s.name;
-              break;
-            }
-          }
+          final subjectsMap = {for (final s in subjects) s.id: s};
+          foundSubjectName =
+              NoteFilterHelper.resolveSubject(subjectId, subjectsMap)?.name;
         }
 
         String? foundSlotInfo;
@@ -212,14 +212,18 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
             _resolvedSlotInfo = foundSlotInfo;
           });
 
-          // Tự động gán tiêu đề môn học nếu tiêu đề đang trống hoặc chứa UUID
+          // Tự động gán tiêu đề môn học nếu tiêu đề đang trống hoặc chứa UUID thô
           final currentTitle = _titleController.text.trim();
+          final uuidRegex = RegExp(
+            r'^(Ghi chú:\s*)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+          );
           final titleIsUuid = currentTitle.isEmpty ||
-              currentTitle.contains(subjectId) ||
-              currentTitle.startsWith('Ghi chú: 0') ||
-              currentTitle.startsWith('Ghi chú: f') ||
-              currentTitle.contains('-');
-          if (titleIsUuid && foundSubjectName != null && foundSubjectName.isNotEmpty) {
+              currentTitle == subjectId ||
+              currentTitle == 'Ghi chú: $subjectId' ||
+              uuidRegex.hasMatch(currentTitle);
+          if (titleIsUuid &&
+              foundSubjectName != null &&
+              foundSubjectName.isNotEmpty) {
             _titleController.text = 'Ghi chú: $foundSubjectName';
             context
                 .read<NoteEditorBloc>()
@@ -278,6 +282,12 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    if (source == ImageSource.camera) {
+      final hasPermission =
+          await MediaPermissionHelper.ensureCameraPermission(context);
+      if (!hasPermission || !mounted) return;
+    }
+
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -287,7 +297,10 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
         imageQuality: 85,
       );
       if (picked != null && mounted) {
-        context.read<NoteEditorBloc>().add(AddImage(picked.path));
+        final persistentPath =
+            await MediaPermissionHelper.persistPickedFile(picked.path);
+        if (!mounted) return;
+        context.read<NoteEditorBloc>().add(AddImage(persistentPath));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Đã thêm ảnh vào ghi chú thành công!'),
@@ -298,9 +311,21 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể chọn ảnh: $e')),
-        );
+        if (MediaPermissionHelper.isCameraDeniedError(e)) {
+          await MediaPermissionHelper.showCameraPermissionDialog(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                MediaPermissionHelper.formatMediaError(
+                  e,
+                  fallbackPrefix: 'Không thể chọn ảnh',
+                ),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -386,8 +411,10 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              child: Wrap(
+                alignment: WrapAlignment.spaceEvenly,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   TextButton.icon(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
@@ -416,26 +443,24 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
 
   Future<void> _showSubjectPickerDialog(
       BuildContext context, String currentSubject) async {
-    List<String> subjectOptions = [];
+    List<Subject> timetableSubjects = [];
     try {
       if (getIt.isRegistered<TimetableRepository>()) {
-        final list = await getIt<TimetableRepository>().getSubjects();
-        subjectOptions =
-            list.map((s) => s.name.isNotEmpty ? s.name : s.id).toList();
+        timetableSubjects = await getIt<TimetableRepository>().getSubjects();
       }
     } catch (_) {}
 
-    if (!subjectOptions.contains('Chung / Tự do')) {
-      subjectOptions.insert(0, 'Chung / Tự do');
-    }
+    final subjectsMap = {for (final s in timetableSubjects) s.id: s};
+    final matchedSubject =
+        NoteFilterHelper.resolveSubject(currentSubject, subjectsMap);
+    final isGeneral = NoteFilterHelper.isGeneralSubjectId(currentSubject);
 
     final customCtrl = TextEditingController(
-      text: (currentSubject != 'general' && currentSubject != 'Chung / Tự do')
-          ? currentSubject
-          : '',
+      text: (!isGeneral && matchedSubject == null) ? currentSubject : '',
     );
 
     if (!context.mounted) return;
+    final bloc = context.read<NoteEditorBloc>();
 
     await showDialog<void>(
       context: context,
@@ -457,31 +482,47 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (subjectOptions.isNotEmpty) ...[
-                const Text('Môn học trong thời khóa biểu:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: subjectOptions.map((subj) {
-                    final isSel = currentSubject == subj ||
-                        (currentSubject == 'general' && subj == 'Chung / Tự do');
+              const Text(
+                'Môn học trong thời khóa biểu:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Chung / Tự do'),
+                    selected: isGeneral,
+                    onSelected: (_) {
+                      setState(() => _resolvedSubjectName = null);
+                      bloc.add(const UpdateSubject('general'));
+                      Navigator.of(dialogCtx).pop();
+                    },
+                  ),
+                  ...timetableSubjects.map((subj) {
+                    final isSel = matchedSubject?.id == subj.id;
                     return ChoiceChip(
-                      label: Text(subj),
+                      avatar: CircleAvatar(
+                        backgroundColor: Color(subj.colorArgb),
+                        radius: 6,
+                      ),
+                      label: Text(subj.name.isNotEmpty ? subj.name : subj.id),
                       selected: isSel,
                       onSelected: (_) {
-                        final val = subj == 'Chung / Tự do' ? 'general' : subj;
-                        context.read<NoteEditorBloc>().add(UpdateSubject(val));
+                        setState(() => _resolvedSubjectName = subj.name);
+                        bloc.add(UpdateSubject(subj.id));
                         Navigator.of(dialogCtx).pop();
                       },
                     );
-                  }).toList(),
-                ),
-                const Divider(height: 24),
-              ],
-              const Text('Hoặc nhập tên môn khác:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  }),
+                ],
+              ),
+              const Divider(height: 24),
+              const Text(
+                'Hoặc nhập tên môn khác:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: customCtrl,
@@ -504,7 +545,15 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
             onPressed: () {
               final val = customCtrl.text.trim();
               if (val.isNotEmpty) {
-                context.read<NoteEditorBloc>().add(UpdateSubject(val));
+                final matched =
+                    NoteFilterHelper.resolveSubject(val, subjectsMap);
+                if (matched != null) {
+                  setState(() => _resolvedSubjectName = matched.name);
+                  bloc.add(UpdateSubject(matched.id));
+                } else {
+                  setState(() => _resolvedSubjectName = val);
+                  bloc.add(UpdateSubject(val));
+                }
               }
               Navigator.of(dialogCtx).pop();
             },
@@ -513,6 +562,7 @@ class _NoteEditorViewState extends State<_NoteEditorView> {
         ],
       ),
     );
+    customCtrl.dispose();
   }
 
   Future<void> _exportPdf(NoteEditorState state) async {

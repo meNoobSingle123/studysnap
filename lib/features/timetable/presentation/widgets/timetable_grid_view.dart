@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/injection.dart';
@@ -6,290 +9,329 @@ import '../../domain/entities/subject.dart';
 import '../../domain/entities/timetable_slot.dart';
 import '../../domain/repositories/timetable_repository.dart';
 
-/// Khung giờ học mặc định của sinh viên đại học
-class TimeInterval {
-  final int startMin; // phút trong ngày (vd 480 = 08:00)
-  final int endMin;   // phút trong ngày (vd 540 = 09:00)
-
-  const TimeInterval(this.startMin, this.endMin);
-
-  String get label {
-    final startH = (startMin ~/ 60).toString().padLeft(2, '0');
-    final startM = (startMin % 60).toString().padLeft(2, '0');
-    final endH = (endMin ~/ 60).toString().padLeft(2, '0');
-    final endM = (endMin % 60).toString().padLeft(2, '0');
-    return '$startH:$startM -\n$endH:$endM';
-  }
-
-  String get singleLineLabel {
-    final startH = (startMin ~/ 60).toString().padLeft(2, '0');
-    final startM = (startMin % 60).toString().padLeft(2, '0');
-    final endH = (endMin ~/ 60).toString().padLeft(2, '0');
-    final endM = (endMin % 60).toString().padLeft(2, '0');
-    return '$startH:$startM - $endH:$endM';
-  }
-}
-
-/// Bảng ma trận Thời khóa biểu theo tuần (College Grid Timetable)
-/// theo đúng phong cách bảng lưới quản lý trực quan của sinh viên đại học:
-/// - Cột đầu hiển thị Khung giờ (Time) màu xanh lá.
-/// - Các cột tiếp theo hiển thị các Thứ (Thứ 2 -> Chủ nhật) màu xanh dương.
-/// - Các ô lưới hiển thị môn học với khối màu đặc trưng (Physics, Maths...).
-/// - Chạm vào bất kỳ ô nào để nhập/chỉnh sửa môn học trực tiếp ("muốn nhập gì cũng được").
+/// Bảng lưới Thời khóa biểu theo trục từng giờ (Hourly Timeline Grid, 06:00 - 23:00+).
+///
+/// - Hiển thị chính xác từng phút (VD: 13:30 - 16:00) và cả ca tối (19:30 - 22:00+).
+/// - Lọc đúng các ca học thuộc tuần đang xem (`Tuần trước` / `Tuần này` / `Tuần sau`).
+/// - Ca học không bật lặp lại chỉ hiển thị ở đúng 1 ngày đó, không tự lặp sang tuần sau.
 class TimetableGridView extends StatefulWidget {
   final List<TimetableSlot> allSlots;
   final Map<String, Subject> subjectsMap;
   final VoidCallback onDataChanged;
+  final DateTime? initialFocusDate;
+  final int todayResetVersion;
+  final DateTime? nowForTest;
 
   const TimetableGridView({
     super.key,
     required this.allSlots,
     required this.subjectsMap,
     required this.onDataChanged,
+    this.initialFocusDate,
+    this.todayResetVersion = 0,
+    this.nowForTest,
   });
 
   @override
   State<TimetableGridView> createState() => _TimetableGridViewState();
 }
 
-class _TimetableGridViewState extends State<TimetableGridView> {
-  // Danh sách các khung giờ mặc định (có thể thêm/xóa hàng)
-  late List<TimeInterval> _timeIntervals;
+class _SlotGroup {
+  final TimetableSlot primary;
+  final List<TimetableSlot> groupSlots;
+  int laneIndex = 0;
+  int laneCount = 1;
 
-  final List<Map<String, dynamic>> _days = const [
-    {'day': 1, 'label': 'Thứ 2\nMon'},
-    {'day': 2, 'label': 'Thứ 3\nTue'},
-    {'day': 3, 'label': 'Thứ 4\nWed'},
-    {'day': 4, 'label': 'Thứ 5\nThu'},
-    {'day': 5, 'label': 'Thứ 6\nFri'},
-    {'day': 6, 'label': 'Thứ 7\nSat'},
-    {'day': 7, 'label': 'Chủ nhật\nSun'},
+  _SlotGroup({
+    required this.primary,
+    required this.groupSlots,
+  });
+}
+
+class _DayOption {
+  final int day;
+  final String fullLabel;
+  final String shortLabel;
+
+  const _DayOption({
+    required this.day,
+    required this.fullLabel,
+    required this.shortLabel,
+  });
+}
+
+class _TimetableGridViewState extends State<TimetableGridView> {
+  static const double _hourHeight = 64.0;
+  static const double _timeAxisWidth = 58.0;
+  static const double _dayColWidth = 114.0;
+  static const double _dayColSpacing = 4.0;
+  static const double _headerHeight = 56.0;
+
+  static const List<_DayOption> _days = [
+    _DayOption(day: 1, fullLabel: 'Thứ 2', shortLabel: 'T2'),
+    _DayOption(day: 2, fullLabel: 'Thứ 3', shortLabel: 'T3'),
+    _DayOption(day: 3, fullLabel: 'Thứ 4', shortLabel: 'T4'),
+    _DayOption(day: 4, fullLabel: 'Thứ 5', shortLabel: 'T5'),
+    _DayOption(day: 5, fullLabel: 'Thứ 6', shortLabel: 'T6'),
+    _DayOption(day: 6, fullLabel: 'Thứ 7', shortLabel: 'T7'),
+    _DayOption(day: 7, fullLabel: 'Chủ nhật', shortLabel: 'CN'),
   ];
+
+  late final ScrollController _headerHScroll;
+  late final ScrollController _bodyHScroll;
+  late final ScrollController _vScroll;
+
+  late DateTime _weekMonday;
+
+  bool _syncingHeader = false;
+  bool _syncingBody = false;
 
   @override
   void initState() {
     super.initState();
-    _initTimeIntervals();
+    _headerHScroll = ScrollController()..addListener(_onHeaderHScroll);
+    _bodyHScroll = ScrollController()..addListener(_onBodyHScroll);
+    _vScroll = ScrollController();
+
+    final seedDate = widget.initialFocusDate ?? widget.nowForTest ?? DateTime.now();
+    _weekMonday = _mondayOfWeek(seedDate);
   }
 
-  void _initTimeIntervals() {
-    // Khung giờ chuẩn theo lịch học đại học
-    _timeIntervals = [
-      const TimeInterval(420, 540),   // 07:00 - 09:00
-      const TimeInterval(555, 675),   // 09:15 - 11:15
-      const TimeInterval(780, 900),   // 13:00 - 15:00
-      const TimeInterval(915, 1035),  // 15:15 - 17:15
-      const TimeInterval(1050, 1170), // 17:30 - 19:30
-    ];
+  @override
+  void didUpdateWidget(covariant TimetableGridView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.todayResetVersion != oldWidget.todayResetVersion) {
+      _weekMonday = _mondayOfWeek(widget.nowForTest ?? DateTime.now());
+      return;
+    }
+    final newFocus = widget.initialFocusDate;
+    final oldFocus = oldWidget.initialFocusDate;
+    if (newFocus != null && newFocus != oldFocus) {
+      _weekMonday = _mondayOfWeek(newFocus);
+    }
+  }
 
-    // Bổ sung các khung giờ đặc thù nếu trong slots có sẵn các giờ khác
-    for (final slot in widget.allSlots) {
-      if (slot.isDeleted) continue;
-      final exists = _timeIntervals.any(
-        (t) => (slot.startMin >= t.startMin && slot.startMin < t.endMin) ||
-               (slot.endMin > t.startMin && slot.endMin <= t.endMin),
-      );
-      if (!exists) {
-        _timeIntervals.add(TimeInterval(slot.startMin, slot.endMin));
+  @override
+  void dispose() {
+    _headerHScroll.removeListener(_onHeaderHScroll);
+    _bodyHScroll.removeListener(_onBodyHScroll);
+    _headerHScroll.dispose();
+    _bodyHScroll.dispose();
+    _vScroll.dispose();
+    super.dispose();
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  DateTime _mondayOfWeek(DateTime d) {
+    final clean = _dateOnly(d);
+    return clean.subtract(Duration(days: clean.weekday - 1));
+  }
+
+  DateTime _dateForWeekday(int dayOfWeek) {
+    return _weekMonday.add(Duration(days: dayOfWeek - 1));
+  }
+
+  void _onHeaderHScroll() {
+    if (_syncingHeader || !_bodyHScroll.hasClients) return;
+    _syncingBody = true;
+    final target =
+        _headerHScroll.offset.clamp(0.0, _bodyHScroll.position.maxScrollExtent);
+    if ((_bodyHScroll.offset - target).abs() > 0.5) {
+      _bodyHScroll.jumpTo(target);
+    }
+    _syncingBody = false;
+  }
+
+  void _onBodyHScroll() {
+    if (_syncingBody || !_headerHScroll.hasClients) return;
+    _syncingHeader = true;
+    final target =
+        _bodyHScroll.offset.clamp(0.0, _headerHScroll.position.maxScrollExtent);
+    if ((_headerHScroll.offset - target).abs() > 0.5) {
+      _headerHScroll.jumpTo(target);
+    }
+    _syncingHeader = false;
+  }
+
+  ({int startHour, int endHour}) _computeHourBounds(
+    Map<int, List<_SlotGroup>> dayGroups,
+  ) {
+    int startHour = 6;
+    int endHour = 23;
+    for (final groups in dayGroups.values) {
+      for (final g in groups) {
+        final slot = g.primary;
+        final slotStartHour = (slot.startMin ~/ 60).clamp(0, 23);
+        final slotEndHour = ((slot.endMin + 59) ~/ 60).clamp(1, 24);
+        if (slotStartHour < startHour) startHour = slotStartHour;
+        if (slotEndHour > endHour) endHour = slotEndHour;
       }
     }
-    _timeIntervals.sort((a, b) => a.startMin.compareTo(b.startMin));
+    if (endHour <= startHour) endHour = math.min(24, startHour + 1);
+    return (startHour: startHour, endHour: endHour);
   }
 
-  /// Tìm slot nằm trong ngày và khung giờ này
-  TimetableSlot? _findSlotFor(int dayOfWeek, TimeInterval interval) {
-    for (final slot in widget.allSlots) {
-      if (slot.isDeleted || slot.dayOfWeek != dayOfWeek) continue;
-      // Trùng hoặc giao nhau với khung giờ
-      if ((slot.startMin >= interval.startMin && slot.startMin < interval.endMin) ||
-          (slot.endMin > interval.startMin && slot.endMin <= interval.endMin) ||
-          (slot.startMin <= interval.startMin && slot.endMin >= interval.endMin)) {
-        return slot;
-      }
-    }
-    return null;
-  }
+  /// Lọc đúng các ca có hiệu lực trong tuần [_weekMonday .. _weekMonday + 6d],
+  /// gom ca trùng và chia cột cạnh nhau nếu có 2 môn khác nhau chồng giờ.
+  Map<int, List<_SlotGroup>> _buildPositionedGroupsForDisplayedWeek() {
+    final result = <int, List<_SlotGroup>>{};
 
-  /// Thêm hàng giờ mới
-  Future<void> _addNewTimeInterval() async {
-    const start = TimeOfDay(hour: 8, minute: 0);
-
-    final pickedStart = await showTimePicker(
-      context: context,
-      initialTime: start,
-      helpText: 'Chọn giờ bắt đầu ca học',
-    );
-    if (pickedStart == null || !mounted) return;
-
-    final pickedEnd = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: pickedStart.hour + 1, minute: pickedStart.minute + 30),
-      helpText: 'Chọn giờ kết thúc ca học',
-    );
-    if (pickedEnd == null || !mounted) return;
-
-    final startMin = pickedStart.hour * 60 + pickedStart.minute;
-    final endMin = pickedEnd.hour * 60 + pickedEnd.minute;
-
-    if (endMin <= startMin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Giờ kết thúc phải sau giờ bắt đầu!')),
-      );
-      return;
-    }
-
-    setState(() {
-      _timeIntervals.add(TimeInterval(startMin, endMin));
-      _timeIntervals.sort((a, b) => a.startMin.compareTo(b.startMin));
-    });
-  }
-
-  /// Chèn hàng giờ mới (Insert Row) tại vị trí chỉ định
-  Future<void> _insertTimeInterval(int index) async {
-    final current = _timeIntervals[index];
-    final defaultStartH = current.endMin ~/ 60;
-    final defaultStartM = current.endMin % 60;
-
-    final pickedStart = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: defaultStartH % 24, minute: defaultStartM),
-      helpText: 'Chọn giờ bắt đầu hàng mới',
-    );
-    if (pickedStart == null || !mounted) return;
-
-    final pickedEnd = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(
-        hour: (pickedStart.hour + 1) % 24,
-        minute: pickedStart.minute,
-      ),
-      helpText: 'Chọn giờ kết thúc hàng mới',
-    );
-    if (pickedEnd == null || !mounted) return;
-
-    final startMin = pickedStart.hour * 60 + pickedStart.minute;
-    final endMin = pickedEnd.hour * 60 + pickedEnd.minute;
-
-    if (endMin <= startMin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Giờ kết thúc phải sau giờ bắt đầu!')),
-      );
-      return;
-    }
-
-    setState(() {
-      _timeIntervals.add(TimeInterval(startMin, endMin));
-      _timeIntervals.sort((a, b) => a.startMin.compareTo(b.startMin));
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã chèn hàng khung giờ mới.')),
-      );
-    }
-  }
-
-  /// Sửa khung giờ ca học (Edit Time)
-  Future<void> _editTimeInterval(int index) async {
-    final current = _timeIntervals[index];
-    final pickedStart = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: current.startMin ~/ 60, minute: current.startMin % 60),
-      helpText: 'Sửa giờ bắt đầu',
-    );
-    if (pickedStart == null || !mounted) return;
-
-    final pickedEnd = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: current.endMin ~/ 60, minute: current.endMin % 60),
-      helpText: 'Sửa giờ kết thúc',
-    );
-    if (pickedEnd == null || !mounted) return;
-
-    final startMin = pickedStart.hour * 60 + pickedStart.minute;
-    final endMin = pickedEnd.hour * 60 + pickedEnd.minute;
-
-    if (endMin <= startMin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Giờ kết thúc phải sau giờ bắt đầu!')),
-      );
-      return;
-    }
-
-    setState(() {
-      _timeIntervals[index] = TimeInterval(startMin, endMin);
-      _timeIntervals.sort((a, b) => a.startMin.compareTo(b.startMin));
-    });
-  }
-
-  /// Xóa hàng khung giờ (Delete Row - có xác nhận nếu có ca học)
-  Future<void> _deleteTimeInterval(int index) async {
-    final interval = _timeIntervals[index];
-    final affectedSlots = widget.allSlots.where((s) =>
-        !s.isDeleted &&
-        ((s.startMin >= interval.startMin && s.startMin < interval.endMin) ||
-            (s.endMin > interval.startMin && s.endMin <= interval.endMin) ||
-            (s.startMin <= interval.startMin && s.endMin >= interval.endMin))).toList();
-
-    if (affectedSlots.isNotEmpty) {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Xác nhận xóa hàng'),
-          content: Text(
-            'Hàng này đang có ${affectedSlots.length} ca học. Xóa hàng sẽ xóa luôn các ca học trên lịch. Bạn có chắc muốn xóa?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Xóa tất cả'),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true || !mounted) return;
-
-      try {
-        final repo = getIt<TimetableRepository>();
-        for (final s in affectedSlots) {
-          await repo.deleteSlot(s.id);
+    for (final d in _days) {
+      final colDate = _dateForWeekday(d.day);
+      final daySlots = widget.allSlots.where((s) {
+        if (s.isDeleted || s.dayOfWeek != d.day || s.endMin <= s.startMin) {
+          return false;
         }
-        widget.onDataChanged();
-      } catch (_) {}
+        final startOnly = _dateOnly(s.termStart);
+        final endOnly = _dateOnly(s.termEnd);
+        return !colDate.isBefore(startOnly) && !colDate.isAfter(endOnly);
+      }).toList();
+
+      if (daySlots.isEmpty) continue;
+
+      final groupedByKey = <String, List<TimetableSlot>>{};
+      for (final slot in daySlots) {
+        final key =
+            '${slot.subjectId}|${slot.startMin}|${slot.endMin}|${slot.room}';
+        groupedByKey.putIfAbsent(key, () => []).add(slot);
+      }
+
+      final groups = groupedByKey.values
+          .map((list) => _SlotGroup(primary: list.first, groupSlots: list))
+          .toList()
+        ..sort((a, b) {
+          final cmp = a.primary.startMin.compareTo(b.primary.startMin);
+          if (cmp != 0) return cmp;
+          return a.primary.endMin.compareTo(b.primary.endMin);
+        });
+
+      final clusters = <List<_SlotGroup>>[];
+      var currentCluster = <_SlotGroup>[];
+      int clusterEnd = -1;
+
+      for (final g in groups) {
+        if (currentCluster.isEmpty) {
+          currentCluster.add(g);
+          clusterEnd = g.primary.endMin;
+        } else if (g.primary.startMin < clusterEnd) {
+          currentCluster.add(g);
+          if (g.primary.endMin > clusterEnd) {
+            clusterEnd = g.primary.endMin;
+          }
+        } else {
+          clusters.add(currentCluster);
+          currentCluster = [g];
+          clusterEnd = g.primary.endMin;
+        }
+      }
+      if (currentCluster.isNotEmpty) {
+        clusters.add(currentCluster);
+      }
+
+      for (final cluster in clusters) {
+        final laneEnds = <int>[];
+        for (final g in cluster) {
+          int placedLane = -1;
+          for (int i = 0; i < laneEnds.length; i++) {
+            if (laneEnds[i] <= g.primary.startMin) {
+              laneEnds[i] = g.primary.endMin;
+              placedLane = i;
+              break;
+            }
+          }
+          if (placedLane == -1) {
+            placedLane = laneEnds.length;
+            laneEnds.add(g.primary.endMin);
+          }
+          g.laneIndex = placedLane;
+        }
+        final totalLanes = laneEnds.length;
+        for (final g in cluster) {
+          g.laneCount = totalLanes;
+        }
+      }
+
+      result[d.day] = groups;
     }
 
-    setState(() {
-      _timeIntervals.removeAt(index);
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã xóa hàng khung giờ.')),
-      );
-    }
+    return result;
   }
 
-  /// Nhập môn học trực tiếp vào ô lưới ("muốn nhập gì trong đây cx được")
-  Future<void> _openCellEditor(int dayOfWeek, TimeInterval interval, [TimetableSlot? existingSlot]) async {
+  bool _isSlotRecurring(TimetableSlot slot, _SlotGroup? group) {
+    final startOnly = _dateOnly(slot.termStart);
+    final endOnly = _dateOnly(slot.termEnd);
+    final spanDays = endOnly.difference(startOnly).inDays;
+    return spanDays >= 6 || (group != null && group.groupSlots.length > 1);
+  }
+
+  String _formatHourTick(int hour) {
+    return '${hour.toString().padLeft(2, '0')}:00';
+  }
+
+  String _formatTimeOfDay(TimeOfDay t) {
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  TimeOfDay _minutesToTimeOfDay(int minutes) {
+    final clamped = minutes.clamp(0, 23 * 60 + 59);
+    return TimeOfDay(hour: clamped ~/ 60, minute: clamped % 60);
+  }
+
+  Future<void> _openCellEditor(
+    DateTime targetDate, {
+    required int initialStartMin,
+    required int initialEndMin,
+    _SlotGroup? existingGroup,
+  }) async {
+    final existingSlot = existingGroup?.primary;
+    final targetDateOnly = _dateOnly(targetDate);
+    final dayOfWeek = targetDateOnly.weekday;
     final theme = Theme.of(context);
+
     final subjectCtrl = TextEditingController(
       text: existingSlot != null
           ? (widget.subjectsMap[existingSlot.subjectId]?.name ?? '')
           : '',
     );
     final roomCtrl = TextEditingController(text: existingSlot?.room ?? '');
-    final buildingCtrl = TextEditingController(text: existingSlot?.buildingId ?? '');
+    final buildingCtrl =
+        TextEditingController(text: existingSlot?.buildingId ?? '');
 
     int selectedColorArgb = existingSlot != null
         ? (widget.subjectsMap[existingSlot.subjectId]?.colorArgb ?? 0xFFFFA000)
-        : 0xFFFFA000; // Mặc định vàng ấm học đường
+        : 0xFFFFA000;
 
-    final dayName = _days.firstWhere((d) => d['day'] == dayOfWeek)['label'].replaceAll('\n', ' - ');
+    TimeOfDay startTime = _minutesToTimeOfDay(
+      existingSlot?.startMin ?? initialStartMin,
+    );
+    TimeOfDay endTime = _minutesToTimeOfDay(
+      existingSlot?.endMin ?? initialEndMin,
+    );
 
-    final result = await showModalBottomSheet<bool>(
+    bool repeatWeekly = existingSlot != null
+        ? _isSlotRecurring(existingSlot, existingGroup)
+        : false;
+    int repeatWeeks = 15;
+    if (existingSlot != null && repeatWeekly) {
+      final diffDays =
+          _dateOnly(existingSlot.termEnd).difference(_dateOnly(existingSlot.termStart)).inDays;
+      if (diffDays >= 7) {
+        repeatWeeks = ((diffDays ~/ 7) + 1).clamp(2, 20);
+      } else if (existingGroup != null && existingGroup.groupSlots.length > 1) {
+        repeatWeeks = existingGroup.groupSlots.length.clamp(2, 20);
+      }
+    }
+
+    final selectedDays = <int>{dayOfWeek};
+    String? inlineError;
+
+    final targetDateText = DateFormat('dd/MM/yyyy').format(targetDateOnly);
+    final dayOptionLabel = _days
+        .firstWhere((d) => d.day == dayOfWeek, orElse: () => _days.first)
+        .fullLabel;
+
+    final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -297,12 +339,50 @@ class _TimetableGridViewState extends State<TimetableGridView> {
       ),
       builder: (sheetCtx) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
+          builder: (modalContext, setSheetState) {
+            final sortedDayNames = _days
+                .where((d) => selectedDays.contains(d.day))
+                .map((d) => d.fullLabel)
+                .join(', ');
+
+            Future<void> pickStart() async {
+              final picked = await showTimePicker(
+                context: sheetCtx,
+                initialTime: startTime,
+                helpText: 'Chọn hoặc nhập giờ bắt đầu',
+              );
+              if (picked == null) return;
+              setSheetState(() {
+                startTime = picked;
+                final newStart = picked.hour * 60 + picked.minute;
+                final currentEnd = endTime.hour * 60 + endTime.minute;
+                if (currentEnd <= newStart) {
+                  endTime = _minutesToTimeOfDay(
+                    math.min(newStart + 60, 23 * 60 + 59),
+                  );
+                }
+                inlineError = null;
+              });
+            }
+
+            Future<void> pickEnd() async {
+              final picked = await showTimePicker(
+                context: sheetCtx,
+                initialTime: endTime,
+                helpText: 'Chọn hoặc nhập giờ kết thúc',
+              );
+              if (picked == null) return;
+              setSheetState(() {
+                endTime = picked;
+                inlineError = null;
+              });
+            }
+
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
-                top: 16,
+                top: 14,
                 bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
               ),
               child: SingleChildScrollView(
@@ -324,47 +404,57 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          existingSlot != null ? 'Chỉnh sửa môn học' : 'Nhập môn học vào bảng',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            existingSlot != null
+                                ? 'Chỉnh sửa ca học'
+                                : 'Thêm ca học vào lưới',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         if (existingSlot != null)
                           IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.red),
                             tooltip: 'Xóa ca học này',
-                            onPressed: () => Navigator.of(sheetCtx).pop(false),
+                            onPressed: () =>
+                                Navigator.of(sheetCtx).pop('delete'),
                           ),
                       ],
                     ),
                     Text(
-                      '$dayName | Khung giờ: ${interval.singleLineLabel}',
+                      repeatWeekly
+                          ? '${_formatTimeOfDay(startTime)} - ${_formatTimeOfDay(endTime)} • Lặp lại: ${sortedDayNames.isEmpty ? dayOptionLabel : sortedDayNames}'
+                          : '${_formatTimeOfDay(startTime)} - ${_formatTimeOfDay(endTime)} • Duy nhất $dayOptionLabel ($targetDateText)',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
                     // 1. Tên môn học
                     TextField(
+                      key: const ValueKey('grid_editor_subject_field'),
                       controller: subjectCtrl,
-                      autofocus: existingSlot == null,
                       decoration: InputDecoration(
-                        labelText: 'Tên môn học (*)',
-                        hintText: 'Ví dụ: Lập trình Flutter, Toán rời rạc...',
+                        labelText: 'Tên môn học *',
+                        hintText: 'VD: Lập trình Flutter, Tiếng Anh tối...',
                         prefixIcon: const Icon(Icons.book_outlined),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: theme.colorScheme.surfaceContainerLow,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
 
-                    // Gợi ý chọn nhanh từ các môn đã có
+                    // Chọn nhanh môn có sẵn
                     if (widget.subjectsMap.isNotEmpty) ...[
-                      Text('Hoặc chọn nhanh môn có sẵn:', style: theme.textTheme.labelSmall),
+                      Text('Chọn nhanh môn có sẵn:',
+                          style: theme.textTheme.labelSmall),
                       const SizedBox(height: 6),
                       SizedBox(
                         height: 34,
@@ -378,7 +468,8 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                                   backgroundColor: Color(subj.colorArgb),
                                   radius: 6,
                                 ),
-                                label: Text(subj.name, style: const TextStyle(fontSize: 12)),
+                                label: Text(subj.name,
+                                    style: const TextStyle(fontSize: 12)),
                                 onPressed: () {
                                   setSheetState(() {
                                     subjectCtrl.text = subj.name;
@@ -393,7 +484,184 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                       const SizedBox(height: 12),
                     ],
 
-                    // 2. Phòng học & Tòa nhà
+                    // 2. Chọn hoặc nhập trực tiếp giờ bắt đầu / kết thúc
+                    Text('Khung giờ học:',
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            key: const ValueKey('grid_editor_start_time'),
+                            onTap: pickStart,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'Bắt đầu',
+                                prefixIcon: const Icon(
+                                    Icons.access_time_rounded,
+                                    size: 18),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 10),
+                              ),
+                              child: Text(
+                                _formatTimeOfDay(startTime),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: InkWell(
+                            key: const ValueKey('grid_editor_end_time'),
+                            onTap: pickEnd,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'Kết thúc',
+                                prefixIcon: const Icon(
+                                    Icons.access_time_filled_rounded,
+                                    size: 18),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 10),
+                              ),
+                              child: Text(
+                                _formatTimeOfDay(endTime),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 3. Công tắc Bật/Tắt Lặp lại hàng tuần (tắt mặc định để không lặp tuần sau)
+                    Card(
+                      elevation: 0,
+                      margin: EdgeInsets.zero,
+                      color: theme.colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: SwitchListTile(
+                        key: const ValueKey('grid_editor_repeat_switch'),
+                        value: repeatWeekly,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        secondary: Icon(
+                          repeatWeekly
+                              ? Icons.event_repeat_rounded
+                              : Icons.today_rounded,
+                          color: repeatWeekly
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline,
+                        ),
+                        title: const Text(
+                          'Lặp lại hàng tuần',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        subtitle: Text(
+                          repeatWeekly
+                              ? 'Hiện lịch vào các thứ đã chọn ở các tuần sau'
+                              : 'Chỉ học 1 ngày $targetDateText (tuần sau không hiện)',
+                          style: const TextStyle(fontSize: 11.5),
+                        ),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            repeatWeekly = val;
+                            if (!val) {
+                              selectedDays
+                                ..clear()
+                                ..add(dayOfWeek);
+                            }
+                            inlineError = null;
+                          });
+                        },
+                      ),
+                    ),
+
+                    if (repeatWeekly) ...[
+                      const SizedBox(height: 12),
+                      Text('Chọn các thứ lặp lại trong tuần:',
+                          style: theme.textTheme.labelMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _days.map((d) {
+                          final isSelected = selectedDays.contains(d.day);
+                          return FilterChip(
+                            key: ValueKey('grid_weekday_chip_${d.day}'),
+                            label: Text(
+                              d.shortLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            selected: isSelected,
+                            showCheckmark: false,
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (checked) {
+                              setSheetState(() {
+                                if (checked) {
+                                  selectedDays.add(d.day);
+                                } else if (selectedDays.length > 1) {
+                                  selectedDays.remove(d.day);
+                                }
+                                inlineError = null;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<int>(
+                        key: const ValueKey('grid_editor_repeat_weeks'),
+                        initialValue: repeatWeeks.clamp(2, 20),
+                        decoration: InputDecoration(
+                          labelText: 'Thời gian lặp lại',
+                          prefixIcon: const Icon(Icons.repeat_on_rounded, size: 19),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        items: List.generate(19, (index) => index + 2).map((w) {
+                          return DropdownMenuItem<int>(
+                            value: w,
+                            child: Text('$w tuần liên tiếp'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setSheetState(() => repeatWeeks = val);
+                          }
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+
+                    // 4. Phòng học & Địa điểm
                     Row(
                       children: [
                         Expanded(
@@ -401,9 +669,11 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                             controller: roomCtrl,
                             decoration: InputDecoration(
                               labelText: 'Phòng học',
-                              hintText: 'VD: A1-402',
-                              prefixIcon: const Icon(Icons.meeting_room_outlined),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              hintText: 'VD: H2.304',
+                              prefixIcon:
+                                  const Icon(Icons.meeting_room_outlined),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               filled: true,
                               fillColor: theme.colorScheme.surfaceContainerLow,
                             ),
@@ -415,9 +685,10 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                             controller: buildingCtrl,
                             decoration: InputDecoration(
                               labelText: 'Địa điểm',
-                              hintText: 'VD: Cơ sở 1, Tòa A...',
+                              hintText: 'VD: Tòa H2...',
                               prefixIcon: const Icon(Icons.business_outlined),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               filled: true,
                               fillColor: theme.colorScheme.surfaceContainerLow,
                             ),
@@ -425,21 +696,22 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
-                    // 3. Màu sắc môn học (Pastel Palette)
-                    Text('Màu đánh dấu môn học:', style: theme.textTheme.labelMedium),
+                    // 5. Màu sắc môn học
+                    Text('Màu đánh dấu môn học:',
+                        style: theme.textTheme.labelMedium),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 10,
                       children: [
-                        0xFFFFA000, // Vàng hổ phách (Physics style)
-                        0xFF5E48E8, // Indigo tím hiện đại
-                        0xFF00897B, // Xanh mòng két
-                        0xFFE53935, // Đỏ san hô
-                        0xFF1E88E5, // Xanh lam
-                        0xFF8E24AA, // Tím violet
-                        0xFFFB8C00, // Cam ấm
+                        0xFFFFA000,
+                        0xFF5E48E8,
+                        0xFF00897B,
+                        0xFFE53935,
+                        0xFF1E88E5,
+                        0xFF8E24AA,
+                        0xFFFB8C00,
                       ].map((colorValue) {
                         final isSelected = selectedColorArgb == colorValue;
                         return GestureDetector(
@@ -447,44 +719,73 @@ class _TimetableGridViewState extends State<TimetableGridView> {
                             setSheetState(() => selectedColorArgb = colorValue);
                           },
                           child: Container(
-                            width: 32,
-                            height: 32,
+                            width: 30,
+                            height: 30,
                             decoration: BoxDecoration(
                               color: Color(colorValue),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isSelected ? Colors.black : Colors.transparent,
+                                color: isSelected
+                                    ? Colors.black
+                                    : Colors.transparent,
                                 width: 2.5,
                               ),
                             ),
                             child: isSelected
-                                ? const Icon(Icons.check, size: 18, color: Colors.white)
+                                ? const Icon(Icons.check,
+                                    size: 17, color: Colors.white)
                                 : null,
                           ),
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 20),
 
-                    // Nút Lưu ca học
+                    if (inlineError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        inlineError ?? '',
+                        style: TextStyle(
+                          color: theme.colorScheme.error,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+
                     SizedBox(
                       width: double.infinity,
                       height: 48,
                       child: FilledButton.icon(
+                        key: const ValueKey('grid_editor_save_btn'),
                         style: FilledButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () {
                           if (subjectCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Vui lòng nhập tên môn học!')),
-                            );
+                            setSheetState(() =>
+                                inlineError = 'Vui lòng nhập tên môn học.');
                             return;
                           }
-                          Navigator.of(sheetCtx).pop(true);
+                          final s = startTime.hour * 60 + startTime.minute;
+                          final e = endTime.hour * 60 + endTime.minute;
+                          if (e <= s) {
+                            setSheetState(() => inlineError =
+                                'Giờ kết thúc phải sau giờ bắt đầu.');
+                            return;
+                          }
+                          Navigator.of(sheetCtx).pop('save');
                         },
                         icon: const Icon(Icons.save_rounded),
-                        label: const Text('Lưu vào bảng thời khóa biểu', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: Text(
+                          repeatWeekly
+                              ? (selectedDays.length > 1
+                                  ? 'Lưu lặp ${selectedDays.length} thứ ($repeatWeeks tuần)'
+                                  : 'Lưu lặp hàng tuần ($repeatWeeks tuần)')
+                              : 'Lưu duy nhất ngày $targetDateText',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],
@@ -496,23 +797,31 @@ class _TimetableGridViewState extends State<TimetableGridView> {
       },
     );
 
-    if (result == false && existingSlot != null) {
-      // Xóa ca học
+    if (result == 'delete' && existingSlot != null) {
       try {
         final repo = getIt<TimetableRepository>();
-        await repo.deleteSlot(existingSlot.id);
+        final idsToDelete =
+            existingGroup?.groupSlots.map((s) => s.id).toList() ??
+                [existingSlot.id];
+        for (final id in idsToDelete) {
+          await repo.deleteSlot(id);
+        }
         widget.onDataChanged();
       } catch (_) {}
-    } else if (result == true) {
-      // Lưu ca học mới hoặc cập nhật
+      return;
+    }
+
+    if (result == 'save') {
       final subjName = subjectCtrl.text.trim();
       final room = roomCtrl.text.trim();
       final building = buildingCtrl.text.trim();
+      final chosenStartMin = startTime.hour * 60 + startTime.minute;
+      final chosenEndMin = endTime.hour * 60 + endTime.minute;
+      final now = DateTime.now();
 
       try {
         final repo = getIt<TimetableRepository>();
 
-        // Tìm môn học đã có theo tên hoặc tạo mới
         Subject? matchedSubj;
         for (final s in widget.subjectsMap.values) {
           if (s.name.toLowerCase() == subjName.toLowerCase()) {
@@ -534,34 +843,112 @@ class _TimetableGridViewState extends State<TimetableGridView> {
             name: subjName,
             credits: 3,
             colorArgb: selectedColorArgb,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
+            createdAt: now,
+            updatedAt: now,
           );
           await repo.saveSubject(newSubj);
         } else if (matchedSubj.colorArgb != selectedColorArgb) {
-          final updatedSubj = matchedSubj.copyWith(
-            colorArgb: selectedColorArgb,
-            updatedAt: DateTime.now(),
+          await repo.saveSubject(
+            matchedSubj.copyWith(colorArgb: selectedColorArgb, updatedAt: now),
           );
-          await repo.saveSubject(updatedSubj);
         }
 
-        final slotId = existingSlot?.id ?? const Uuid().v4();
-        final newSlot = TimetableSlot(
-          id: slotId,
-          subjectId: subjectId,
-          room: room,
-          buildingId: building.isNotEmpty ? building : null,
-          dayOfWeek: dayOfWeek,
-          startMin: interval.startMin,
-          endMin: interval.endMin,
-          termStart: DateTime.now().subtract(const Duration(days: 30)),
-          termEnd: DateTime.now().add(const Duration(days: 120)),
-          source: 'manual',
-          updatedAt: DateTime.now(),
-        );
+        final slotsToSave = <TimetableSlot>[];
+        final effectiveDays = repeatWeekly ? selectedDays : <int>{dayOfWeek};
 
-        await repo.saveSlots([newSlot]);
+        DateTime startDateForDay(int d) => _dateForWeekday(d);
+        DateTime endDateForDay(int d) {
+          final start = startDateForDay(d);
+          if (!repeatWeekly) return start;
+          return start.add(Duration(days: 7 * (repeatWeeks - 1)));
+        }
+
+        if (existingSlot != null) {
+          final existingDay = existingSlot.dayOfWeek;
+          final groupList =
+              existingGroup?.groupSlots ?? <TimetableSlot>[existingSlot];
+
+          if (effectiveDays.contains(existingDay)) {
+            final primary = groupList.first;
+            // Nếu trước đó có nhiều bản ghi tuần mà nay tắt lặp lại, dọn bớt các bản ghi khác
+            if (!repeatWeekly && groupList.length > 1) {
+              for (int i = 1; i < groupList.length; i++) {
+                await repo.deleteSlot(groupList[i].id);
+              }
+            }
+            slotsToSave.add(
+              primary.copyWith(
+                subjectId: subjectId,
+                startMin: chosenStartMin,
+                endMin: chosenEndMin,
+                room: room,
+                buildingId: building.isNotEmpty ? building : null,
+                termStart: startDateForDay(existingDay),
+                termEnd: endDateForDay(existingDay),
+                updatedAt: now,
+              ),
+            );
+          } else {
+            for (final s in groupList) {
+              await repo.deleteSlot(s.id);
+            }
+          }
+
+          if (repeatWeekly) {
+            for (final day in effectiveDays) {
+              if (day == existingDay) continue;
+              final dStart = startDateForDay(day);
+              final dEnd = endDateForDay(day);
+              final alreadyHas = widget.allSlots.any((s) =>
+                  !s.isDeleted &&
+                  s.dayOfWeek == day &&
+                  s.subjectId == subjectId &&
+                  s.startMin == chosenStartMin &&
+                  s.endMin == chosenEndMin &&
+                  !dStart.isBefore(_dateOnly(s.termStart)) &&
+                  !dStart.isAfter(_dateOnly(s.termEnd)));
+              if (!alreadyHas) {
+                slotsToSave.add(
+                  TimetableSlot(
+                    id: const Uuid().v4(),
+                    subjectId: subjectId,
+                    room: room,
+                    buildingId: building.isNotEmpty ? building : null,
+                    dayOfWeek: day,
+                    startMin: chosenStartMin,
+                    endMin: chosenEndMin,
+                    termStart: dStart,
+                    termEnd: dEnd,
+                    source: 'user',
+                    updatedAt: now,
+                  ),
+                );
+              }
+            }
+          }
+        } else {
+          for (final day in effectiveDays) {
+            slotsToSave.add(
+              TimetableSlot(
+                id: const Uuid().v4(),
+                subjectId: subjectId,
+                room: room,
+                buildingId: building.isNotEmpty ? building : null,
+                dayOfWeek: day,
+                startMin: chosenStartMin,
+                endMin: chosenEndMin,
+                termStart: startDateForDay(day),
+                termEnd: endDateForDay(day),
+                source: 'user',
+                updatedAt: now,
+              ),
+            );
+          }
+        }
+
+        if (slotsToSave.isNotEmpty) {
+          await repo.saveSlots(slotsToSave);
+        }
         widget.onDataChanged();
       } catch (e) {
         if (mounted) {
@@ -577,488 +964,628 @@ class _TimetableGridViewState extends State<TimetableGridView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentWeekday = DateTime.now().weekday; // 1: Thứ 2 ... 7: Chủ nhật
+    final now = widget.nowForTest ?? DateTime.now();
+    final todayOnly = _dateOnly(now);
+    final currentWeekMonday = _mondayOfWeek(todayOnly);
+    final isCurrentWeekDisplayed = _weekMonday == currentWeekMonday;
+    final nowMin = now.hour * 60 + now.minute;
 
-    const double colWidth = 112.0;
-    const double timeColWidth = 80.0;
-    const double rowHeight = 86.0;
+    final weekSunday = _weekMonday.add(const Duration(days: 6));
+    final weekRangeLabel =
+        'Tuần ${DateFormat('dd/MM').format(_weekMonday)} - ${DateFormat('dd/MM/yyyy').format(weekSunday)}';
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.vertical,
-      physics: const BouncingScrollPhysics(),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 16, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── HÀNG TIÊU ĐỀ: Khung giờ & Các Thứ trong tuần ──────────────────
-              Row(
-                children: [
-                  // Cột Tiêu đề Khung Giờ (Time)
-                  Container(
-                    width: timeColWidth,
-                    height: 56,
+    final dayGroups = _buildPositionedGroupsForDisplayedWeek();
+    final bounds = _computeHourBounds(dayGroups);
+    final startHour = bounds.startHour;
+    final endHour = bounds.endHour;
+    final totalHours = endHour - startHour;
+    final timelineHeight = totalHours * _hourHeight;
+    final dayGridWidth =
+        (_days.length * _dayColWidth) + (_days.length * _dayColSpacing);
+
+    final showNowLine = isCurrentWeekDisplayed &&
+        nowMin >= startHour * 60 &&
+        nowMin <= endHour * 60;
+    final nowTop = ((nowMin - startHour * 60) / 60.0) * _hourHeight;
+
+    final weekNavBar = Container(
+      margin: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            key: const ValueKey('grid_prev_week_btn'),
+            tooltip: 'Tuần trước',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_left_rounded, size: 22),
+            onPressed: () {
+              setState(() {
+                _weekMonday = _weekMonday.subtract(const Duration(days: 7));
+              });
+            },
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                weekRangeLabel,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('grid_next_week_btn'),
+            tooltip: 'Tuần sau',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_right_rounded, size: 22),
+            onPressed: () {
+              setState(() {
+                _weekMonday = _weekMonday.add(const Duration(days: 7));
+              });
+            },
+          ),
+        ],
+      ),
+    );
+
+    final headerBar = Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+      child: Row(
+        children: [
+          Container(
+            width: _timeAxisWidth,
+            height: _headerHeight,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.schedule_rounded,
+                    size: 16, color: colorScheme.primary),
+                const SizedBox(height: 2),
+                Text(
+                  'Giờ',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _headerHScroll,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: _days.map((d) {
+                  final colDate = _dateForWeekday(d.day);
+                  final isToday = colDate == todayOnly;
+                  final dateLabel = DateFormat('dd/MM').format(colDate);
+                  return Container(
+                    width: _dayColWidth,
+                    height: _headerHeight,
+                    margin: const EdgeInsets.only(right: _dayColSpacing),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(14),
-                        bottomLeft: Radius.circular(14),
-                      ),
+                      color: isToday
+                          ? colorScheme.primaryContainer
+                          : colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        color: isToday
+                            ? colorScheme.primary.withValues(alpha: 0.6)
+                            : colorScheme.outlineVariant
+                                .withValues(alpha: 0.35),
+                        width: isToday ? 1.5 : 1.0,
                       ),
                     ),
                     alignment: Alignment.center,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.schedule_rounded,
-                          size: 16,
-                          color: colorScheme.primary,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                d.fullLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isToday
+                                      ? colorScheme.onPrimaryContainer
+                                      : colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            if (isToday) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
-                          'Ca học',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
+                          isToday ? 'Hôm nay ($dateLabel)' : dateLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isToday
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                            fontSize: 10,
+                            fontWeight:
+                                isToday ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 4),
-
-                  // Các cột Thứ (Mon -> Sun) với chỉ báo Hôm nay (Today Highlight)
-                  ..._days.map((d) {
-                    final dayInt = d['day'] as int;
-                    final isToday = dayInt == currentWeekday;
-                    final labelParts = (d['label'] as String).split('\n');
-                    final dayVi = labelParts.first;
-                    final dayEn = labelParts.length > 1 ? labelParts[1] : '';
-
-                    return Container(
-                      width: colWidth,
-                      height: 56,
-                      margin: const EdgeInsets.only(right: 4),
-                      decoration: BoxDecoration(
-                        color: isToday
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isToday
-                              ? colorScheme.primary.withValues(alpha: 0.6)
-                              : colorScheme.outlineVariant.withValues(alpha: 0.35),
-                          width: isToday ? 1.5 : 1.0,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  dayVi,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: isToday
-                                        ? colorScheme.onPrimaryContainer
-                                        : colorScheme.onSurface,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11.5,
-                                  ),
-                                ),
-                              ),
-                              if (isToday) ...[
-                                const SizedBox(width: 3),
-                                Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            isToday ? 'Hôm nay' : dayEn,
-                            style: TextStyle(
-                              color: isToday
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                              fontSize: 10,
-                              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+                  );
+                }).toList(),
               ),
-              const SizedBox(height: 6),
+            ),
+          ),
+        ],
+      ),
+    );
 
-              // ── CÁC HÀNG MA TRẬN: Khung giờ & Môn học trong ô ────────────────
-              ..._timeIntervals.asMap().entries.map((entry) {
-                final rowIndex = entry.key;
-                final interval = entry.value;
-
-                final startH = (interval.startMin ~/ 60).toString().padLeft(2, '0');
-                final startM = (interval.startMin % 60).toString().padLeft(2, '0');
-                final endH = (interval.endMin ~/ 60).toString().padLeft(2, '0');
-                final endM = (interval.endMin % 60).toString().padLeft(2, '0');
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: Row(
-                    children: [
-                      // Cột Giờ bên trái: PopupMenuButton mở menu Insert / Delete Row chuẩn xác tại hàng
-                      PopupMenuButton<String>(
-                        tooltip: 'Thao tác hàng ca học',
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 6,
-                        onSelected: (selected) {
-                          if (selected == 'insert') {
-                            _insertTimeInterval(rowIndex);
-                          } else if (selected == 'delete') {
-                            _deleteTimeInterval(rowIndex);
-                          } else if (selected == 'edit') {
-                            _editTimeInterval(rowIndex);
-                          }
-                        },
-                        itemBuilder: (ctx) => [
-                          const PopupMenuItem<String>(
-                            value: 'insert',
-                            child: Row(
-                              children: [
-                                Icon(Icons.add_circle_outline, color: Color(0xFF5E48E8), size: 19),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Chèn thêm hàng',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuDivider(height: 1),
-                          const PopupMenuItem<String>(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete_outline, color: Colors.red, size: 19),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Xóa hàng này',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13.5,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuDivider(height: 1),
-                          const PopupMenuItem<String>(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.access_time_rounded, color: Colors.teal, size: 19),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Sửa khung giờ',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        child: Container(
-                          width: timeColWidth,
-                          height: rowHeight,
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primary.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'Ca ${rowIndex + 1}',
-                                      style: TextStyle(
-                                        color: colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 9.5,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Icon(
-                                    Icons.more_vert_rounded,
-                                    size: 13,
-                                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$startH:$startM',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              Text(
-                                '$endH:$endM',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
+    final timelineContent = Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cột mốc giờ cố định bên trái (06:00, 07:00, ..., 22:00)
+          SizedBox(
+            width: _timeAxisWidth,
+            height: timelineHeight,
+            child: Stack(
+              children: List.generate(totalHours, (index) {
+                final hour = startHour + index;
+                return Positioned(
+                  top: index * _hourHeight,
+                  left: 0,
+                  right: 0,
+                  height: _hourHeight,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4, right: 8),
+                      child: Text(
+                        _formatHourTick(hour),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11.5,
                         ),
                       ),
-                      const SizedBox(width: 4),
-
-                      // Các ô môn học của từng Thứ
-                      ..._days.map((d) {
-                        final dayOfWeek = d['day'] as int;
-                        final isToday = dayOfWeek == currentWeekday;
-                        final slot = _findSlotFor(dayOfWeek, interval);
-                        final subject = slot != null ? widget.subjectsMap[slot.subjectId] : null;
-
-                        final Color baseColor = subject != null
-                            ? Color(subject.colorArgb)
-                            : (slot != null ? const Color(0xFF1E88E5) : Colors.transparent);
-
-                        return Container(
-                          width: colWidth,
-                          height: rowHeight,
-                          margin: const EdgeInsets.only(right: 4),
-                          child: slot != null
-                              ? Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () => _openCellEditor(dayOfWeek, interval, slot),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: baseColor.withValues(alpha: 0.14),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: baseColor.withValues(alpha: 0.45),
-                                          width: 1.2,
-                                        ),
-                                      ),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: Stack(
-                                        children: [
-                                          // Dải màu nhấn nổi bật ở cạnh trái
-                                          Positioned(
-                                            left: 0,
-                                            top: 0,
-                                            bottom: 0,
-                                            width: 4.5,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: baseColor,
-                                                borderRadius: const BorderRadius.only(
-                                                  topLeft: Radius.circular(12),
-                                                  bottomLeft: Radius.circular(12),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          // Nội dung môn học
-                                          Padding(
-                                            padding: const EdgeInsets.fromLTRB(10, 8, 6, 6),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  subject?.name ?? 'Môn học',
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 11.5,
-                                                    height: 1.2,
-                                                    color: colorScheme.onSurface,
-                                                  ),
-                                                ),
-                                                if (slot.room.isNotEmpty)
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: baseColor.withValues(alpha: 0.2),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.meeting_room_rounded,
-                                                          size: 11,
-                                                          color: baseColor,
-                                                        ),
-                                                        const SizedBox(width: 3),
-                                                        Flexible(
-                                                          child: Text(
-                                                            slot.room,
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(
-                                                              fontSize: 9.5,
-                                                              fontWeight: FontWeight.bold,
-                                                              color: colorScheme.onSurface,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () => _openCellEditor(dayOfWeek, interval, slot),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: isToday
-                                            ? colorScheme.primary.withValues(alpha: 0.03)
-                                            : colorScheme.surfaceContainerLowest,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: isToday
-                                              ? colorScheme.primary.withValues(alpha: 0.25)
-                                              : colorScheme.outlineVariant.withValues(alpha: 0.25),
-                                          width: 0.8,
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Icon(
-                                        Icons.add_rounded,
-                                        size: 18,
-                                        color: colorScheme.outline.withValues(alpha: 0.35),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                        );
-                      }),
-                    ],
+                    ),
                   ),
                 );
               }),
+            ),
+          ),
+          const SizedBox(width: 4),
 
-              const SizedBox(height: 6),
+          // Bảng lưới 7 cột ngày theo tỷ lệ giờ chính xác từng phút
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _bodyHScroll,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: SizedBox(
+                width: dayGridWidth,
+                height: timelineHeight,
+                child: Stack(
+                  children: [
+                    // 1. Nền từng ô 1 giờ cho 7 ngày
+                    Row(
+                      children: _days.map((d) {
+                        final colDate = _dateForWeekday(d.day);
+                        final isToday = colDate == todayOnly;
+                        return Container(
+                          width: _dayColWidth,
+                          height: timelineHeight,
+                          margin: const EdgeInsets.only(right: _dayColSpacing),
+                          child: Column(
+                            children: List.generate(totalHours, (hourIdx) {
+                              final hour = startHour + hourIdx;
+                              return InkWell(
+                                key: ValueKey('grid_empty_${d.day}_$hour'),
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => _openCellEditor(
+                                  colDate,
+                                  initialStartMin: hour * 60,
+                                  initialEndMin:
+                                      math.min((hour + 1) * 60, 23 * 60 + 59),
+                                ),
+                                child: Container(
+                                  height: _hourHeight,
+                                  decoration: BoxDecoration(
+                                    color: isToday
+                                        ? colorScheme.primary
+                                            .withValues(alpha: 0.03)
+                                        : colorScheme.surfaceContainerLowest,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: colorScheme.outlineVariant
+                                          .withValues(alpha: 0.3),
+                                      width: 0.7,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        );
+                      }).toList(),
+                    ),
 
-              // ── HÀNG NÚT "+" ĐỂ THÊM KHUNG GIỜ MỚI & THANH HƯỚNG DẪN ─────────
-              Row(
-                children: [
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: _addNewTimeInterval,
-                      child: Container(
-                        width: timeColWidth,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF5E48E8), // Sắc tím hiện đại như ảnh mẫu
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF5E48E8).withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                    // 2. Các khối môn học đặt chính xác theo startMin..endMin
+                    for (int colIdx = 0; colIdx < _days.length; colIdx++)
+                      ...(() {
+                        final dayInt = _days[colIdx].day;
+                        final colDate = _dateForWeekday(dayInt);
+                        final groups = dayGroups[dayInt] ?? const <_SlotGroup>[];
+                        final colLeft = colIdx * (_dayColWidth + _dayColSpacing);
+
+                        return groups.map((group) {
+                          final slot = group.primary;
+                          final subject = widget.subjectsMap[slot.subjectId];
+                          final baseColor = subject != null
+                              ? Color(subject.colorArgb)
+                              : const Color(0xFF1E88E5);
+
+                          const innerPad = 2.5;
+                          const laneGap = 2.0;
+                          final usableWidth = _dayColWidth -
+                              (2 * innerPad) -
+                              ((group.laneCount - 1) * laneGap);
+                          final cardWidth =
+                              math.max(24.0, usableWidth / group.laneCount);
+                          final cardLeft = colLeft +
+                              innerPad +
+                              group.laneIndex * (cardWidth + laneGap);
+
+                          final cardTop = ((slot.startMin - startHour * 60) /
+                                      60.0) *
+                                  _hourHeight +
+                              1.5;
+                          final cardHeight = math.max(
+                            30.0,
+                            ((slot.endMin - slot.startMin) / 60.0) *
+                                    _hourHeight -
+                                3.0,
+                          );
+
+                          final cardBg = Color.alphaBlend(
+                            baseColor.withValues(
+                              alpha: theme.brightness == Brightness.dark
+                                  ? 0.28
+                                  : 0.16,
                             ),
-                          ],
-                        ),
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.add_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                            colorScheme.surface,
+                          );
 
-                  // Thanh hướng dẫn M3
-                  Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.lightbulb_outline_rounded,
-                          size: 16,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Chạm ô để nhập môn • Chạm cột Giờ để Thêm/Xóa/Sửa khung giờ',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11,
+                          final timeRangeLabel =
+                              '${slot.startTimeFormatted} - ${slot.endTimeFormatted}';
+
+                          return Positioned(
+                            key: ValueKey('grid_slot_${slot.id}'),
+                            left: cardLeft,
+                            top: cardTop,
+                            width: cardWidth,
+                            height: cardHeight,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => _openCellEditor(
+                                  colDate,
+                                  initialStartMin: slot.startMin,
+                                  initialEndMin: slot.endMin,
+                                  existingGroup: group,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: cardBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: baseColor.withValues(alpha: 0.55),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Stack(
+                                    children: [
+                                      Positioned(
+                                        left: 0,
+                                        top: 0,
+                                        bottom: 0,
+                                        width: 4.0,
+                                        child: Container(color: baseColor),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            8, 4, 5, 4),
+                                        child: _buildSlotCardContent(
+                                          theme: theme,
+                                          colorScheme: colorScheme,
+                                          baseColor: baseColor,
+                                          subjectName:
+                                              subject?.name ?? 'Môn học',
+                                          timeRange: timeRangeLabel,
+                                          room: slot.room,
+                                          cardHeight: cardHeight,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        });
+                      })(),
+
+                    // 3. Vạch chỉ giờ hiện tại (Google Calendar style)
+                    if (showNowLine) ...[
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: nowTop.clamp(0.0, timelineHeight - 2),
+                        child: IgnorePointer(
+                          child: Container(
+                            height: 1.2,
+                            color: colorScheme.onSurface.withValues(alpha: 0.22),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                      Positioned(
+                        left: ((todayOnly.weekday - 1) *
+                                (_dayColWidth + _dayColSpacing))
+                            .clamp(0.0, dayGridWidth - _dayColWidth),
+                        width: _dayColWidth,
+                        top: (nowTop - 5).clamp(0.0, timelineHeight - 10),
+                        child: IgnorePointer(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.onSurface,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  height: 2.0,
+                                  color: colorScheme.onSurface
+                                      .withValues(alpha: 0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+
+    final tipBar = Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
       ),
+      child: Row(
+        children: [
+          Icon(Icons.touch_app_outlined, size: 16, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Chạm vào ô giờ để thêm/chỉnh giờ lẻ hoặc bật lặp lại theo thứ.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedHeight) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              weekNavBar,
+              headerBar,
+              timelineContent,
+              tipBar,
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            weekNavBar,
+            headerBar,
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _vScroll,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                child: timelineContent,
+              ),
+            ),
+            tipBar,
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSlotCardContent({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required Color baseColor,
+    required String subjectName,
+    required String timeRange,
+    required String room,
+    required double cardHeight,
+  }) {
+    if (cardHeight < 44) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          '$subjectName • $timeRange',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+            color: colorScheme.onSurface,
+          ),
+        ),
+      );
+    }
+
+    if (cardHeight < 68) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            subjectName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 11.5,
+              height: 1.15,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            room.isNotEmpty ? '$timeRange • $room' : timeRange,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              subjectName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 11.5,
+                height: 1.2,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              timeRange,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        if (room.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: baseColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.meeting_room_rounded, size: 10.5, color: baseColor),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    room,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

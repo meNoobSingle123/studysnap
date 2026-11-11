@@ -1,14 +1,20 @@
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nhom_7/core/l10n/strings.dart';
+import 'package:nhom_7/features/notes/data/repositories/in_memory_note_repository.dart';
 import 'package:nhom_7/features/notes/domain/entities/stroke.dart';
+import 'package:nhom_7/features/notes/domain/usecases/get_note_by_id_usecase.dart';
+import 'package:nhom_7/features/notes/domain/usecases/save_note_usecase.dart';
 import 'package:nhom_7/features/notes/presentation/bloc/canvas_bloc.dart';
 import 'package:nhom_7/features/notes/presentation/bloc/canvas_event.dart';
+import 'package:nhom_7/features/notes/presentation/bloc/note_editor_bloc.dart';
 import 'package:nhom_7/features/notes/presentation/pages/canvas_page.dart';
+import 'package:nhom_7/features/notes/presentation/pages/note_editor_page.dart';
 import 'package:nhom_7/features/notes/presentation/widgets/canvas/canvas_drawing_board.dart';
 import 'package:nhom_7/features/notes/presentation/widgets/canvas/canvas_toolbar.dart';
 
@@ -187,6 +193,62 @@ void main() {
       // Should be back to the initial page, no dialog shown
       expect(find.text(AppStrings.canvasDiscardConfirmTitle), findsNothing);
       expect(find.text('Open Canvas'), findsOneWidget);
+    });
+
+    testWidgets(
+        'standalone sketch mode shows Tạo ghi chú and navigates to NoteEditorPage with title, body, and image',
+        (tester) async {
+      final tempDir = Directory.systemTemp.createTempSync('canvas_test_docs');
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'getApplicationDocumentsDirectory') {
+          return tempDir.path;
+        }
+        return tempDir.path;
+      });
+      addTearDown(() async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final repo = InMemoryNoteRepository(seedMockData: false);
+      GetIt.instance.registerFactory<NoteEditorBloc>(
+        () => NoteEditorBloc(
+          getNoteByIdUseCase: GetNoteByIdUseCase(repo),
+          saveNoteUseCase: SaveNoteUseCase(repo),
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CanvasPage(
+            originalImageSize: Size(100, 100),
+          ),
+        ),
+      );
+
+      expect(find.text('Bảng vẽ phác thảo'), findsOneWidget);
+      expect(find.text('Tạo ghi chú'), findsOneWidget);
+
+      await tester.tap(find.text('Tạo ghi chú'));
+      for (var i = 0; i < 20; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.byType(NoteEditorPage).evaluate().isNotEmpty &&
+            find.byKey(const ValueKey('note_title_field')).evaluate().isNotEmpty) {
+          break;
+        }
+      }
+
+      expect(find.byType(NoteEditorPage), findsOneWidget);
+      expect(find.byKey(const ValueKey('note_title_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('note_content_field')), findsOneWidget);
     });
   });
 }

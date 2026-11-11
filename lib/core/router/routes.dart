@@ -10,8 +10,6 @@ abstract final class Routes {
   static const String noteEditor = '/notes/edit/:id';
   static String noteEdit(String id) => '/notes/edit/$id';
   static const String canvas = '/notes/canvas';
-  static String canvasRoute({String? noteId}) =>
-      noteId != null ? '/notes/canvas?noteId=$noteId' : '/notes/canvas';
 
   // Timetable Feature (Huy)
   static const String gpaProjection = '/timetable/gpa';

@@ -9,12 +9,14 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../../../core/security/key_storage_service.dart';
 import '../../data/datasources/timetable_remote_data_source.dart';
 import '../../domain/entities/subject.dart';
 import '../../domain/entities/timetable_slot.dart';
 import '../../domain/repositories/timetable_repository.dart';
 import '../../domain/usecases/get_subjects_usecase.dart';
 import '../../domain/usecases/get_timetable_slots_usecase.dart';
+import '../../domain/utils/timetable_sync_parser.dart';
 import '../bloc/timetable_bloc.dart';
 import '../widgets/quick_study_card.dart';
 import '../widgets/timetable_grid_view.dart';
@@ -41,7 +43,116 @@ class _TimetablePageState extends State<TimetablePage> {
             : TimetableRemoteDataSourceImpl(dioClient: getIt()));
   }
 
-  Future<void> _syncTimetable([BuildContext? blocContext]) async {
+  Future<void> _showSyncApiDialog(BuildContext blocContext) async {
+    final keyStorage = getIt.isRegistered<KeyStorageService>()
+        ? getIt<KeyStorageService>()
+        : KeyStorageService();
+    final savedUrl = await keyStorage.getSchoolApiUrl();
+    if (!mounted) return;
+
+    final urlCtrl = TextEditingController(text: savedUrl ?? '');
+    final termCtrl = TextEditingController(text: '2026-1');
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.cloud_sync_outlined, color: Colors.blueAccent),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Đồng bộ lịch học qua API',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Nhập địa chỉ máy chủ API (hoặc link JSON lịch học) để tải danh sách môn và ca học về máy.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: urlCtrl,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'URL API máy chủ',
+                  hintText: 'http://192.168.1.x:3000',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: termCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Mã học kỳ',
+                  hintText: '2026-1',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Demo nội bộ: chạy "node backend/server.js" trên máy tính cùng Wi-Fi, sau đó nhập http://<IP-máy-tính>:3000',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Theme.of(dialogCtx).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text(AppStrings.cancel),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.sync_rounded, size: 18),
+            label: const Text('Đồng bộ ngay'),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    final url = urlCtrl.text.trim();
+    final term = termCtrl.text.trim().isNotEmpty ? termCtrl.text.trim() : '2026-1';
+    urlCtrl.dispose();
+    termCtrl.dispose();
+
+    if (submitted != true || !mounted) return;
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng nhập URL API máy chủ để đồng bộ.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    await keyStorage.saveSchoolApiUrl(url);
+    if (!blocContext.mounted) return;
+    await _syncTimetable(blocContext: blocContext, serverUrl: url, termId: term);
+  }
+
+  Future<void> _syncTimetable({
+    BuildContext? blocContext,
+    String? serverUrl,
+    String termId = '2026-1',
+  }) async {
     if (_isSyncing) return;
 
     setState(() {
@@ -49,7 +160,10 @@ class _TimetablePageState extends State<TimetablePage> {
     });
 
     try {
-      final data = await _effectiveDataSource.getTimetable('2026-1');
+      final cleanUrl = serverUrl?.trim();
+      final data = (cleanUrl != null && cleanUrl.isNotEmpty)
+          ? await _effectiveDataSource.getTimetable(termId, serverUrl: cleanUrl)
+          : await _effectiveDataSource.getTimetable(termId);
       if (!mounted) return;
 
       setState(() {
@@ -57,47 +171,29 @@ class _TimetablePageState extends State<TimetablePage> {
         _isSyncing = false;
       });
 
-      // Nếu có subjects/slots trả về từ server, cập nhật vào local DB
+      int syncedSubjectCount = 0;
+      int syncedSlotCount = 0;
+
+      // Nếu có subjects/slots trả về từ server, cập nhật vào local DB để đồng bộ cả Lưới và Lịch ngày
       if (getIt.isRegistered<TimetableRepository>()) {
         final repo = getIt<TimetableRepository>();
-        final subjectsRaw = data['subjects'] as List<dynamic>? ?? [];
-        final slotsRaw = data['slots'] as List<dynamic>? ?? [];
+        final parsed = TimetableSyncParser.parse(data);
 
-        for (final item in subjectsRaw) {
-          final m = item as Map<String, dynamic>;
-          final subj = Subject(
-            id: m['id'] as String,
-            name: m['name'] as String,
-            code: m['code'] as String? ?? '',
-            credits: m['credits'] as int? ?? 3,
-            colorArgb: m['colorArgb'] as int? ?? 0xFF1976D2,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
+        for (final subj in parsed.subjects) {
           await repo.saveSubject(subj);
+          syncedSubjectCount++;
         }
 
-        final slots = slotsRaw.map((e) {
-          final m = e as Map<String, dynamic>;
-          return TimetableSlot(
-            id: m['id'] as String,
-            subjectId: m['subjectId'] as String,
-            room: m['room'] as String? ?? '',
-            buildingId: m['buildingId'] as String?,
-            dayOfWeek: m['dayOfWeek'] as int? ?? 1,
-            startMin: m['startMin'] as int? ?? 420,
-            endMin: m['endMin'] as int? ?? 540,
-            termStart: DateTime.tryParse(m['termStart'] as String? ?? '') ??
-                DateTime.now(),
-            termEnd: DateTime.tryParse(m['termEnd'] as String? ?? '') ??
-                DateTime.now(),
-            source: 'system',
-            updatedAt: DateTime.now(),
-          );
-        }).toList();
-
-        if (slots.isNotEmpty) {
-          await repo.saveSlots(slots);
+        if (parsed.slots.isNotEmpty) {
+          final existingSlots = await repo.watchAllSlots().first;
+          final syncedIds = parsed.slots.map((s) => s.id).toSet();
+          for (final oldSlot in existingSlots) {
+            if (oldSlot.source == 'system' && !syncedIds.contains(oldSlot.id)) {
+              await repo.deleteSlot(oldSlot.id);
+            }
+          }
+          await repo.saveSlots(parsed.slots);
+          syncedSlotCount = parsed.slots.length;
         }
       }
 
@@ -106,11 +202,15 @@ class _TimetablePageState extends State<TimetablePage> {
       }
 
       if (mounted) {
+        final msg = (syncedSubjectCount > 0 || syncedSlotCount > 0)
+            ? 'Đã đồng bộ $syncedSubjectCount môn học, $syncedSlotCount ca học từ máy chủ!'
+            : AppStrings.syncTimetableSuccess;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppStrings.syncTimetableSuccess),
+          SnackBar(
+            content: Text(msg),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -125,13 +225,17 @@ class _TimetablePageState extends State<TimetablePage> {
         blocContext.read<TimetableBloc>().add(DaySelectedEvent(DateTime.now()));
       }
 
+      final hasCustomUrl = serverUrl != null && serverUrl.trim().isNotEmpty;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Ứng dụng đang chạy Ngoại tuyến (Local-First). Đã làm mới dữ liệu từ máy.',
+            hasCustomUrl
+                ? 'Không kết nối được tới máy chủ API ($serverUrl). Đang giữ dữ liệu ngoại tuyến trên máy.'
+                : 'Ứng dụng đang chạy Ngoại tuyến (Local-First). Đã làm mới dữ liệu từ máy.',
           ),
-          backgroundColor: Colors.blueGrey,
-          duration: Duration(seconds: 4),
+          backgroundColor: hasCustomUrl ? Colors.deepOrange : Colors.blueGrey,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -152,7 +256,7 @@ class _TimetablePageState extends State<TimetablePage> {
         ..add(DaySelectedEvent(DateTime.now())),
       child: Builder(
         builder: (blocContext) => _TimetableView(
-          onSync: () => _syncTimetable(blocContext),
+          onSync: () => _showSyncApiDialog(blocContext),
           isSyncing: _isSyncing,
           syncedData: _syncedData,
         ),
@@ -276,6 +380,7 @@ class _TimetableViewState extends State<_TimetableView> {
   bool _isGridView = true;
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
+  int _gridTodayResetVersion = 0;
 
   Future<void> _pickYearMonth(BuildContext context, DateTime current) async {
     final picked = await showDatePicker(
@@ -386,7 +491,10 @@ class _TimetableViewState extends State<_TimetableView> {
             label: const Text('Hôm nay', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             onPressed: () {
               final now = DateTime.now();
-              setState(() => _focusedDay = now);
+              setState(() {
+                _focusedDay = now;
+                _gridTodayResetVersion++;
+              });
               context.read<TimetableBloc>().add(DaySelectedEvent(now));
             },
           ),
@@ -531,6 +639,8 @@ class _TimetableViewState extends State<_TimetableView> {
               child: TimetableGridView(
                 allSlots: loaded.allSlots,
                 subjectsMap: loaded.subjectsMap,
+                initialFocusDate: loaded.selectedDay,
+                todayResetVersion: _gridTodayResetVersion,
                 onDataChanged: () {
                   context
                       .read<TimetableBloc>()
@@ -1064,6 +1174,27 @@ class _TimetableViewState extends State<_TimetableView> {
             repeatWeeks: repeatWeeks,
           );
         },
+        onSaveRecurring: ({
+          required String subjectName,
+          required String room,
+          String? building,
+          required DateTime startDate,
+          required TimeOfDay startTime,
+          required TimeOfDay endTime,
+          required int repeatWeeks,
+          required List<int> repeatWeekdays,
+        }) async {
+          await _handleSaveSlot(
+            subjectName: subjectName,
+            room: room,
+            building: building,
+            startDate: startDate,
+            startTime: startTime,
+            endTime: endTime,
+            repeatWeeks: repeatWeeks,
+            repeatWeekdays: repeatWeekdays,
+          );
+        },
       ),
     );
   }
@@ -1076,6 +1207,7 @@ class _TimetableViewState extends State<_TimetableView> {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     required int repeatWeeks,
+    List<int>? repeatWeekdays,
   }) async {
     final repo = getIt<TimetableRepository>();
     final existingSubjects = await repo.getSubjects();
@@ -1111,27 +1243,34 @@ class _TimetableViewState extends State<_TimetableView> {
     final startMin = startTime.hour * 60 + startTime.minute;
     final endMin = endTime.hour * 60 + endTime.minute;
     final slotsToSave = <TimetableSlot>[];
+    final startDateOnly =
+        DateTime(startDate.year, startDate.month, startDate.day);
+    final daysList = (repeatWeekdays == null || repeatWeekdays.isEmpty)
+        ? <int>[startDateOnly.weekday]
+        : repeatWeekdays;
 
-    for (int i = 0; i < repeatWeeks; i++) {
-      final currentDate = startDate.add(Duration(days: 7 * i));
-      final dateOnly =
-          DateTime(currentDate.year, currentDate.month, currentDate.day);
+    for (final wd in daysList) {
+      final deltaDays = (wd - startDateOnly.weekday + 7) % 7;
+      final firstDateForWeekday = startDateOnly.add(Duration(days: deltaDays));
 
-      slotsToSave.add(
-        TimetableSlot(
-          id: const Uuid().v4(),
-          subjectId: subject.id,
-          dayOfWeek: currentDate.weekday,
-          startMin: startMin,
-          endMin: endMin,
-          room: room,
-          buildingId: building,
-          termStart: dateOnly,
-          termEnd: dateOnly,
-          source: 'user',
-          updatedAt: now,
-        ),
-      );
+      for (int i = 0; i < repeatWeeks; i++) {
+        final dateOnly = firstDateForWeekday.add(Duration(days: 7 * i));
+        slotsToSave.add(
+          TimetableSlot(
+            id: const Uuid().v4(),
+            subjectId: subject.id,
+            dayOfWeek: dateOnly.weekday,
+            startMin: startMin,
+            endMin: endMin,
+            room: room,
+            buildingId: building,
+            termStart: dateOnly,
+            termEnd: dateOnly,
+            source: 'user',
+            updatedAt: now,
+          ),
+        );
+      }
     }
 
     await repo.saveSlots(slotsToSave);
@@ -1143,8 +1282,8 @@ class _TimetableViewState extends State<_TimetableView> {
     });
     context.read<TimetableBloc>().add(DaySelectedEvent(startDate));
 
-    final msg = repeatWeeks > 1
-        ? 'Đã thêm $repeatWeeks ca học môn "$subjectName" thành công!'
+    final msg = slotsToSave.length > 1
+        ? 'Đã thêm ${slotsToSave.length} ca học môn "$subjectName" thành công!'
         : 'Đã thêm lịch "$subjectName" thành công!';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1168,11 +1307,22 @@ class AddSlotBottomSheet extends StatefulWidget {
     required TimeOfDay endTime,
     required int repeatWeeks,
   }) onSave;
+  final Future<void> Function({
+    required String subjectName,
+    required String room,
+    String? building,
+    required DateTime startDate,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    required int repeatWeeks,
+    required List<int> repeatWeekdays,
+  })? onSaveRecurring;
 
   const AddSlotBottomSheet({
     super.key,
     required this.initialDate,
     required this.onSave,
+    this.onSaveRecurring,
   });
 
   @override
@@ -1180,12 +1330,23 @@ class AddSlotBottomSheet extends StatefulWidget {
 }
 
 class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
+  static const List<({int day, String short, String full})> _weekdayOptions = [
+    (day: DateTime.monday, short: 'T2', full: 'Thứ Hai'),
+    (day: DateTime.tuesday, short: 'T3', full: 'Thứ Ba'),
+    (day: DateTime.wednesday, short: 'T4', full: 'Thứ Tư'),
+    (day: DateTime.thursday, short: 'T5', full: 'Thứ Năm'),
+    (day: DateTime.friday, short: 'T6', full: 'Thứ Sáu'),
+    (day: DateTime.saturday, short: 'T7', full: 'Thứ Bảy'),
+    (day: DateTime.sunday, short: 'CN', full: 'Chủ Nhật'),
+  ];
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _subjectController;
   late final TextEditingController _roomController;
   late final TextEditingController _buildingController;
 
   late DateTime _startDate;
+  late final Set<int> _selectedWeekdays;
   TimeOfDay _startTime = const TimeOfDay(hour: 7, minute: 30);
   TimeOfDay _endTime = const TimeOfDay(hour: 9, minute: 30);
   bool _repeatWeekly = false;
@@ -1199,6 +1360,7 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
     _roomController = TextEditingController();
     _buildingController = TextEditingController();
     _startDate = widget.initialDate;
+    _selectedWeekdays = {widget.initialDate.weekday};
   }
 
   @override
@@ -1246,6 +1408,7 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
     if (picked != null) {
       setState(() {
         _startDate = picked;
+        _selectedWeekdays.add(picked.weekday);
       });
     }
   }
@@ -1294,19 +1457,37 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
     });
 
     final actualRepeatWeeks = _repeatWeekly ? _repeatWeeks : 1;
+    final selectedWeekdays = _repeatWeekly
+        ? (_selectedWeekdays.toList()..sort())
+        : <int>[_startDate.weekday];
 
     try {
-      await widget.onSave(
-        subjectName: _subjectController.text.trim(),
-        room: _roomController.text.trim(),
-        building: _buildingController.text.trim().isNotEmpty
-            ? _buildingController.text.trim()
-            : null,
-        startDate: _startDate,
-        startTime: _startTime,
-        endTime: _endTime,
-        repeatWeeks: actualRepeatWeeks,
-      );
+      if (widget.onSaveRecurring != null) {
+        await widget.onSaveRecurring!(
+          subjectName: _subjectController.text.trim(),
+          room: _roomController.text.trim(),
+          building: _buildingController.text.trim().isNotEmpty
+              ? _buildingController.text.trim()
+              : null,
+          startDate: _startDate,
+          startTime: _startTime,
+          endTime: _endTime,
+          repeatWeeks: actualRepeatWeeks,
+          repeatWeekdays: selectedWeekdays,
+        );
+      } else {
+        await widget.onSave(
+          subjectName: _subjectController.text.trim(),
+          room: _roomController.text.trim(),
+          building: _buildingController.text.trim().isNotEmpty
+              ? _buildingController.text.trim()
+              : null,
+          startDate: _startDate,
+          startTime: _startTime,
+          endTime: _endTime,
+          repeatWeeks: actualRepeatWeeks,
+        );
+      }
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -1563,20 +1744,59 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
               ),
               const SizedBox(height: 12),
 
-              // Khung chọn số tuần khi bật lặp lại
+              // Khung chọn số tuần & các thứ lặp lại khi bật lặp hàng tuần
               if (_repeatWeekly) ...[
+                Text(
+                  'Chọn các thứ lặp lại trong tuần *',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _weekdayOptions.map((opt) {
+                    final isSelected = _selectedWeekdays.contains(opt.day);
+                    return FilterChip(
+                      key: ValueKey('add_slot_weekday_chip_${opt.day}'),
+                      label: Text(
+                        opt.short,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      selected: isSelected,
+                      showCheckmark: false,
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (checked) {
+                        setState(() {
+                          if (checked) {
+                            _selectedWeekdays.add(opt.day);
+                          } else if (_selectedWeekdays.length > 1) {
+                            _selectedWeekdays.remove(opt.day);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   key: const ValueKey('add_slot_repeat_weeks_dropdown'),
                   initialValue: _repeatWeeks < 2 ? 2 : _repeatWeeks,
                   decoration: const InputDecoration(
-                    labelText: 'Số tuần lặp lại (Google Calendar) *',
+                    labelText: 'Số tuần lặp lại *',
                     prefixIcon: Icon(Icons.repeat_on_rounded),
                     border: OutlineInputBorder(),
                   ),
                   items: List.generate(14, (index) => index + 2).map((week) {
+                    final total = week * _selectedWeekdays.length;
                     return DropdownMenuItem<int>(
                       value: week,
-                      child: Text('$week tuần ($week ca học)'),
+                      child: Text('$week tuần ($total ca học)'),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -1614,7 +1834,16 @@ class _AddSlotBottomSheetState extends State<AddSlotBottomSheet> {
                     Expanded(
                       child: Text(
                         _repeatWeekly
-                            ? 'Sẽ tạo $_repeatWeeks ca học vào lúc ${_formatTime(_startTime)} - ${_formatTime(_endTime)} mỗi ${_formatWeekdayName(_startDate.weekday)} từ ${DateFormat('dd/MM/yyyy').format(_startDate)} đến ${DateFormat('dd/MM/yyyy').format(endDate)}.'
+                            ? (() {
+                                final selectedNames = _weekdayOptions
+                                    .where((o) =>
+                                        _selectedWeekdays.contains(o.day))
+                                    .map((o) => o.full)
+                                    .join(', ');
+                                final totalSlots =
+                                    _repeatWeeks * _selectedWeekdays.length;
+                                return 'Sẽ tạo $totalSlots ca học vào lúc ${_formatTime(_startTime)} - ${_formatTime(_endTime)} các ngày $selectedNames trong $_repeatWeeks tuần từ ${DateFormat('dd/MM/yyyy').format(_startDate)} đến ${DateFormat('dd/MM/yyyy').format(endDate)}.';
+                              })()
                             : 'Sẽ tạo 1 lịch sự kiện vào lúc ${_formatTime(_startTime)} - ${_formatTime(_endTime)} ngày ${DateFormat('dd/MM/yyyy').format(_startDate)} (${_formatWeekdayName(_startDate.weekday)}).',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,

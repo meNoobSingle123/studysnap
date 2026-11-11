@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../../core/utils/media_permission_helper.dart';
 import '../../domain/usecases/compress_lecture_image_usecase.dart';
 import '../../domain/usecases/parse_qr_code_usecase.dart';
 import 'scanner_event.dart';
@@ -88,25 +89,43 @@ class ScannerBloc extends Bloc<ScannerEvent, ScannerState> {
     CapturePhotoRequested event,
     Emitter<ScannerState> emit,
   ) async {
-    emit(state.copyWith(isProcessing: true));
+    emit(state.copyWith(isProcessing: true, errorMessage: () => null));
     try {
+      var permStatus = await _checkPermission();
+      if (!permStatus.isGranted && !permStatus.isLimited) {
+        permStatus = await _requestPermission();
+      }
+      if (!permStatus.isGranted && !permStatus.isLimited) {
+        emit(state.copyWith(
+          cameraPermission: permStatus,
+          isProcessing: false,
+          errorMessage: () =>
+              'Chưa cấp quyền Camera. Vui lòng bật quyền Camera trong Cài đặt ứng dụng hoặc chọn ảnh từ Thư viện.',
+        ));
+        return;
+      }
+
       final picked = await imagePicker.pickImage(source: ImageSource.camera);
       if (picked != null) {
         final rawFile = File(picked.path);
         final compressed = await compressLectureImageUseCase(rawFile);
         final updatedList = List<File>.from(state.capturedImages)..add(compressed);
         emit(state.copyWith(
+          cameraPermission: permStatus,
           isProcessing: false,
           capturedImages: updatedList,
           notificationMessage: () => 'Đã chụp và nén ảnh thành công',
         ));
       } else {
-        emit(state.copyWith(isProcessing: false));
+        emit(state.copyWith(cameraPermission: permStatus, isProcessing: false));
       }
     } catch (e) {
       emit(state.copyWith(
         isProcessing: false,
-        errorMessage: () => 'Không thể chụp ảnh: ${e.toString()}',
+        errorMessage: () => MediaPermissionHelper.formatMediaError(
+          e,
+          fallbackPrefix: 'Không thể chụp ảnh',
+        ),
       ));
     }
   }

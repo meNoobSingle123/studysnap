@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
@@ -7,6 +6,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/security/auth_lock_listenable.dart';
+import '../../../../core/security/biometric_lock_helper.dart';
 import '../../../../core/security/key_storage_service.dart';
 import '../../../ai_assistant/presentation/widgets/ai_assistant_bottom_sheet.dart';
 
@@ -55,68 +55,16 @@ class _ToolsPageState extends State<ToolsPage> {
   }
 
   Future<void> _onToggleLock(bool value) async {
-    if (kIsWeb) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.mobileOnlyFeature)),
-        );
-      }
-      return;
-    }
-
-    if (value) {
-      try {
-        final isSupported = await _localAuth.isDeviceSupported();
-        final canCheck = await _localAuth.canCheckBiometrics;
-        if (!isSupported && !canCheck) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text(AppStrings.biometricsNotAvailable)),
-            );
-          }
-          return;
-        }
-
-        final didAuthenticate = await _localAuth.authenticate(
-          localizedReason: AppStrings.biometricAuthRequiredToEnable,
-          biometricOnly: false,
-          persistAcrossBackgrounding: true,
-        );
-
-        if (!didAuthenticate) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text(AppStrings.biometricsFailed)),
-            );
-          }
-          return;
-        }
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(AppStrings.biometricsFailed)),
-          );
-        }
-        return;
-      }
-    }
-
-    await _keyStorage.setLockEnabled(value);
-    AuthLockListenable.instance.setLockEnabled(value);
-
-    if (mounted) {
+    final result = await BiometricLockHelper.toggleLock(
+      context: context,
+      targetValue: value,
+      keyStorage: _keyStorage,
+      localAuth: _localAuth,
+    );
+    if (result != null && mounted) {
       setState(() {
-        _isLockEnabled = value;
+        _isLockEnabled = result;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value
-                ? AppStrings.biometricLockEnabledSuccess
-                : AppStrings.biometricLockDisabledSuccess,
-          ),
-        ),
-      );
     }
   }
 
@@ -285,10 +233,14 @@ class _ToolsPageState extends State<ToolsPage> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'Trung tâm Tiện ích',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              'Trung tâm Tiện ích',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -384,7 +336,7 @@ class _ToolsPageState extends State<ToolsPage> {
                 child: _buildToolGridCard(
                   context: context,
                   title: 'Bảng vẽ phác thảo',
-                  subtitle: 'Vẽ tự do, dạ quang, tẩy & bảng màu',
+                  subtitle: 'Vẽ tự do, highlight & lưu thành ghi chú',
                   icon: Icons.draw_rounded,
                   iconColor: const Color(0xFF8E24AA),
                   onTap: () => context.push(Routes.canvas),
@@ -493,7 +445,10 @@ class _ToolsPageState extends State<ToolsPage> {
                   title: const Text(AppStrings.appSettings),
                   subtitle: const Text('Cấu hình AI Gemini, bộ nhớ đệm, bảo mật và ứng dụng'),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push(Routes.systemSettings),
+                  onTap: () async {
+                    await context.push(Routes.systemSettings);
+                    await _syncFromStorage();
+                  },
                 ),
                 Divider(
                   indent: 68,

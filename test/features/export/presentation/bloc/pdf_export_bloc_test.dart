@@ -218,5 +218,23 @@ void main() {
             )).called(1);
       },
     );
+
+    blocTest<PdfExportBloc, PdfExportState>(
+      'emits PdfExportLoaded with empty bytes when switching to note mode with no notes',
+      build: buildBloc,
+      seed: () => PdfExportLoaded(
+        result: mockResult,
+        exportType: PdfExportType.timetable,
+        orientation: PdfOrientation.portrait,
+        availableNotes: const [],
+      ),
+      act: (bloc) => bloc.add(const ChangePdfTypeEvent(PdfExportType.note)),
+      expect: () => [
+        isA<PdfExportLoading>(),
+        isA<PdfExportLoaded>()
+            .having((s) => s.exportType, 'exportType', PdfExportType.note)
+            .having((s) => s.result.bytes, 'bytes', isEmpty),
+      ],
+    );
   });
 }

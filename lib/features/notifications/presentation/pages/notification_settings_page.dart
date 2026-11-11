@@ -169,18 +169,56 @@ class _NotificationSettingsView extends StatelessWidget {
                         style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
                       ),
                       const SizedBox(height: 12),
-                      SegmentedButton<int>(
-                        showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(value: 5, label: Text('5 phút')),
-                          ButtonSegment(value: 10, label: Text('10 phút')),
-                          ButtonSegment(value: 15, label: Text('15 phút')),
-                          ButtonSegment(value: 30, label: Text('30 phút')),
-                        ],
-                        selected: {loaded.leadMinutes},
-                        onSelectionChanged: (selection) {
-                          context.read<NotificationBloc>().add(ChangeLeadMinutesEvent(selection.first));
-                        },
+                      MediaQuery.withClampedTextScaling(
+                        maxScaleFactor: 1.1,
+                        child: SegmentedButton<int>(
+                          showSelectedIcon: false,
+                          style: SegmentedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 8,
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          segments: const [
+                            ButtonSegment(
+                              value: 5,
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('5 phút', maxLines: 1),
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: 10,
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('10 phút', maxLines: 1),
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: 15,
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('15 phút', maxLines: 1),
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: 30,
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('30 phút', maxLines: 1),
+                              ),
+                            ),
+                          ],
+                          selected: {loaded.leadMinutes},
+                          onSelectionChanged: (selection) {
+                            context.read<NotificationBloc>().add(ChangeLeadMinutesEvent(selection.first));
+                          },
+                        ),
                       ),
                     ],
                   ),

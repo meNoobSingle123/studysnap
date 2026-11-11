@@ -125,4 +125,89 @@ void main() {
     expect(find.byIcon(Icons.stay_current_landscape_rounded), findsOneWidget);
     expect(find.byIcon(Icons.share_rounded), findsOneWidget);
   });
+
+  testWidgets('PdfExportPage in note mode has no overflow on narrow 360px phone screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 760);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final longNote = LectureNote(
+      id: 'note_long',
+      subjectId: 'sub_1',
+      title: 'Bài giảng rất dài về kiến trúc phần mềm và xuất PDF Unicode',
+      bodyText: 'Nội dung chi tiết',
+      createdAt: DateTime(2026, 9, 15),
+      updatedAt: DateTime(2026, 9, 15),
+    );
+    when(() => mockNoteRepo.getAllNotes()).thenAnswer((_) async => [longNote]);
+    when(() => mockNoteRepo.getNoteById(any())).thenAnswer((_) async => longNote);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PdfExportPage(initialType: PdfExportType.note),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text(AppStrings.exportTimetable), findsOneWidget);
+    expect(find.text(AppStrings.exportNotes), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PdfExportPage in note mode with 1.3x text scale on 320px width has zero overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(1.3),
+          ),
+          child: PdfExportPage(initialType: PdfExportType.note),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text(AppStrings.exportTimetable), findsOneWidget);
+    expect(find.text(AppStrings.exportNotes), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PdfExportPage in note mode with no notes shows empty guidance while keeping mode switcher',
+      (tester) async {
+    when(() => mockNoteRepo.getAllNotes()).thenAnswer((_) async => []);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PdfExportPage(initialType: PdfExportType.note),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text(AppStrings.exportTimetable), findsOneWidget);
+    expect(find.text(AppStrings.exportNotes), findsOneWidget);
+    expect(find.text('Chưa có ghi chú bài giảng nào để xuất PDF'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

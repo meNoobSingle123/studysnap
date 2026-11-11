@@ -589,7 +589,10 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -609,7 +612,6 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       // Nhãn nguồn: Hệ thống hay Cá nhân
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -715,22 +717,26 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _isReminderEnabled
-                                  ? Icons.notifications_active_outlined
-                                  : Icons.notifications_off_outlined,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Nhắc giờ học',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isReminderEnabled
+                                    ? Icons.notifications_active_outlined
+                                    : Icons.notifications_off_outlined,
+                                color: theme.colorScheme.primary,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  'Nhắc giờ học',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         Switch(
                           value: _isReminderEnabled,
@@ -810,20 +816,24 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.assignment_turned_in_outlined,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Hạn nộp & Nhiệm vụ (${_deadlines.length})',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.assignment_turned_in_outlined,
+                                color: theme.colorScheme.primary,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  'Hạn nộp & Nhiệm vụ (${_deadlines.length})',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         TextButton.icon(
                           icon: const Icon(Icons.add, size: 18),
@@ -923,20 +933,27 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 const SizedBox(height: 4),
-                                Row(
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons.event_outlined,
-                                      size: 14,
-                                      color: theme.colorScheme.onSurfaceVariant,
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.event_outlined,
+                                          size: 14,
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          DateFormat('dd/MM/yyyy')
+                                              .format(deadline.dueDate),
+                                          style: theme.textTheme.bodySmall,
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      DateFormat('dd/MM/yyyy')
-                                          .format(deadline.dueDate),
-                                      style: theme.textTheme.bodySmall,
-                                    ),
-                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 6,
@@ -956,7 +973,6 @@ class _SlotDetailPageState extends State<SlotDetailPage> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     if (deadline.isCompleted)
                                       Container(
                                         padding: const EdgeInsets.symmetric(

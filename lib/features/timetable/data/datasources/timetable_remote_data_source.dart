@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../../../../core/errors/app_exception.dart';
@@ -11,6 +12,7 @@ abstract class TimetableRemoteDataSource {
     String termId, {
     String? etag,
     String? deviceId,
+    String? serverUrl,
   });
 
   /// Lấy danh sách lịch thi theo học kỳ [termId] (GET /v1/exams?termId=)
@@ -34,6 +36,7 @@ class TimetableRemoteDataSourceImpl implements TimetableRemoteDataSource {
     String termId, {
     String? etag,
     String? deviceId,
+    String? serverUrl,
   }) async {
     try {
       final headers = <String, dynamic>{};
@@ -44,20 +47,69 @@ class TimetableRemoteDataSourceImpl implements TimetableRemoteDataSource {
         headers['X-Device-Id'] = deviceId;
       }
 
-      final response = await dioClient.dio.get<Map<String, dynamic>>(
-        '/v1/timetable',
-        queryParameters: {'termId': termId},
-        options: Options(headers: headers),
-      );
+      String targetUrl = '/v1/timetable';
+      Map<String, dynamic>? queryParams = {'termId': termId};
 
-      if (response.data == null) {
-        throw const ServerException(
-          AppStrings.errorServer,
-          details: 'Empty response body from timetable endpoint',
-        );
+      final custom = serverUrl?.trim() ?? '';
+      if (custom.isNotEmpty) {
+        final normalized = custom.endsWith('/')
+            ? custom.substring(0, custom.length - 1)
+            : custom;
+        if (normalized.endsWith('.json') || normalized.contains('/v1/')) {
+          targetUrl = normalized;
+          if (normalized.endsWith('.json') || normalized.contains('termId=')) {
+            queryParams = null;
+          }
+        } else {
+          targetUrl = '$normalized/v1/timetable';
+        }
       }
 
-      return response.data!;
+      try {
+        final response = await dioClient.dio.get<Map<String, dynamic>>(
+          targetUrl,
+          queryParameters: queryParams,
+          options: Options(headers: headers),
+        );
+
+        final payload = response.data;
+        if (payload == null) {
+          throw const ServerException(
+            AppStrings.errorServer,
+            details: 'Empty response body from timetable endpoint',
+          );
+        }
+
+        return payload;
+      } on TypeError {
+        // Hỗ trợ các link JSON thô trả về Content-Type text/plain
+        final rawResp = await dioClient.dio.get<String>(
+          targetUrl,
+          queryParameters: queryParams,
+          options: Options(
+            headers: headers,
+            responseType: ResponseType.plain,
+          ),
+        );
+        final rawText = rawResp.data?.trim() ?? '';
+        if (rawText.isEmpty) {
+          throw const ServerException(
+            AppStrings.errorServer,
+            details: 'Empty plain-text response body from timetable endpoint',
+          );
+        }
+        final decoded = jsonDecode(rawText);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        throw const ServerException(
+          AppStrings.errorServer,
+          details: 'Invalid JSON format from timetable endpoint',
+        );
+      }
     } on DioException catch (e) {
       _handleDioError(e);
     } catch (e) {

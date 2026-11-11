@@ -157,9 +157,19 @@ void main() {
       updatedAt: DateTime.now(),
     );
 
+    final secondSubject = Subject(
+      id: 'sub_db',
+      code: 'IT3020',
+      name: 'Cơ sở dữ liệu',
+      credits: 3,
+      colorArgb: 0xFF4CAF50,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
     setUp(() {
       noteRepository = InMemoryNoteRepository(seedMockData: false);
-      final timetableRepo = _MockTimetableRepo([testSubject]);
+      final timetableRepo = _MockTimetableRepo([testSubject, secondSubject]);
       final getSubjectsUseCase = GetSubjectsUseCase(timetableRepo);
       final watchAllNotesUseCase = WatchAllNotesUseCase(noteRepository);
       final deleteNoteUseCase = DeleteNoteUseCase(noteRepository);
@@ -287,6 +297,81 @@ void main() {
       // Note should now be deleted, showing empty state
       expect(find.text('Note to Delete'), findsNothing);
       expect(find.text(AppStrings.emptyNotesList), findsOneWidget);
+    });
+
+    testWidgets('tapping subject chip filters notes (including legacy name) and Tất cả môn resets',
+        (tester) async {
+      final flutterNote = LectureNote(
+        id: 'n_flutter',
+        subjectId: 'sub_flutter',
+        title: 'Ghi chú Flutter',
+        bodyText: 'State management',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      final dbNoteLegacy = LectureNote(
+        id: 'n_db',
+        subjectId: 'Cơ sở dữ liệu', // legacy name stored instead of ID
+        title: 'Ghi chú Database',
+        bodyText: 'B-Tree',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await noteRepository.saveNote(flutterNote);
+      await noteRepository.saveNote(dbNoteLegacy);
+
+      await tester.pumpWidget(buildTestHarness());
+      await tester.pumpAndSettle();
+
+      // Both notes shown initially
+      expect(find.text('Ghi chú Flutter'), findsOneWidget);
+      expect(find.text('Ghi chú Database'), findsOneWidget);
+
+      // Tap FilterChip 'Cơ sở dữ liệu'
+      await tester.tap(find.widgetWithText(FilterChip, 'Cơ sở dữ liệu'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ghi chú Database'), findsOneWidget);
+      expect(find.text('Ghi chú Flutter'), findsNothing);
+
+      // Tap 'Tất cả môn' ChoiceChip to restore all
+      await tester.tap(find.widgetWithText(ChoiceChip, AppStrings.allSubjects));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ghi chú Flutter'), findsOneWidget);
+      expect(find.text('Ghi chú Database'), findsOneWidget);
+    });
+
+    testWidgets('unaccented Vietnamese search and clear_filters_btn work cleanly',
+        (tester) async {
+      final note = LectureNote(
+        id: 'n_viet',
+        subjectId: 'sub_db',
+        title: 'Hệ quản trị cơ sở dữ liệu',
+        bodyText: 'Chuẩn hóa dữ liệu quan hệ',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await noteRepository.saveNote(note);
+
+      await tester.pumpWidget(buildTestHarness());
+      await tester.pumpAndSettle();
+
+      // Search without Vietnamese diacritics
+      await tester.enterText(find.byType(TextField), 'quan he');
+      await tester.pumpAndSettle();
+      expect(find.text('Hệ quản trị cơ sở dữ liệu'), findsOneWidget);
+
+      // Enter unmatched query -> shows clear_filters_btn
+      await tester.enterText(find.byType(TextField), 'khong co ket qua');
+      await tester.pumpAndSettle();
+      expect(find.text('Hệ quản trị cơ sở dữ liệu'), findsNothing);
+      expect(find.byKey(const ValueKey('clear_filters_btn')), findsOneWidget);
+
+      // Tap 'Xóa bộ lọc' -> clears query & restores note
+      await tester.tap(find.byKey(const ValueKey('clear_filters_btn')));
+      await tester.pumpAndSettle();
+      expect(find.text('Hệ quản trị cơ sở dữ liệu'), findsOneWidget);
     });
   });
 }

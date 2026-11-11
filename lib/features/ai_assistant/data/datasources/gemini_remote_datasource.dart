@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../../../core/network/dio_client.dart';
@@ -7,6 +8,12 @@ import '../../../../core/security/key_storage_service.dart';
 abstract class GeminiRemoteDataSource {
   Future<String> generateContent({
     required String prompt,
+    String? explicitApiKey,
+  });
+
+  Future<String?> extractTextFromImage({
+    required Uint8List imageBytes,
+    String mimeType = 'image/jpeg',
     String? explicitApiKey,
   });
 
@@ -98,6 +105,61 @@ class GeminiRemoteDataSourceImpl implements GeminiRemoteDataSource {
       }
     }
     throw lastErr ?? Exception('Không thể kết nối đến Trợ lý AI Flash.');
+  }
+
+  @override
+  Future<String?> extractTextFromImage({
+    required Uint8List imageBytes,
+    String mimeType = 'image/jpeg',
+    String? explicitApiKey,
+  }) async {
+    final apiKey = explicitApiKey ?? await getApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty || imageBytes.isEmpty) {
+      return null;
+    }
+
+    final base64Image = base64Encode(imageBytes);
+    final requestBody = {
+      'contents': [
+        {
+          'parts': [
+            {
+              'text':
+                  'Hãy đọc và chép lại CHÍNH XÁC TOÀN BỘ văn bản trong ảnh (bao gồm cả chữ viết tay, chữ in, dấu câu, công thức và đầy đủ dấu tiếng Việt). '
+                      'Giữ nguyên thứ tự từng dòng/đoạn từ trên xuống dưới, từ trái sang phải. '
+                      'Chỉ trả về phần văn bản đọc được, tuyệt đối không thêm lời chào, không giải thích, không tóm tắt và không bỏ sót chữ.'
+            },
+            {
+              'inline_data': {
+                'mime_type': mimeType,
+                'data': base64Image,
+              }
+            }
+          ]
+        }
+      ],
+      'generationConfig': {
+        'temperature': 0.1,
+        'maxOutputTokens': 4096,
+      }
+    };
+
+    for (final model in _flashModels) {
+      try {
+        final text = await _callModel(
+          model: model,
+          apiKey: apiKey.trim(),
+          requestBody: requestBody,
+        );
+        final cleaned = text.trim();
+        if (cleaned.isNotEmpty) {
+          return cleaned;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
   }
 
   Future<String> _callModel({

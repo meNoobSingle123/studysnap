@@ -9,6 +9,66 @@ import 'package:nhom_7/features/notes/domain/usecases/save_note_usecase.dart';
 import 'package:nhom_7/features/notes/presentation/bloc/note_editor_bloc.dart';
 import 'package:nhom_7/features/notes/presentation/pages/note_editor_page.dart';
 import 'package:nhom_7/features/notes/presentation/widgets/media/lecture_video_player.dart';
+import 'package:nhom_7/features/timetable/domain/entities/campus_building.dart';
+import 'package:nhom_7/features/timetable/domain/entities/exam_schedule.dart';
+import 'package:nhom_7/features/timetable/domain/entities/subject.dart';
+import 'package:nhom_7/features/timetable/domain/entities/timetable_slot.dart';
+import 'package:nhom_7/features/timetable/domain/repositories/timetable_repository.dart';
+
+class _FakeTimetableRepository implements TimetableRepository {
+  final List<Subject> subjects;
+
+  _FakeTimetableRepository(this.subjects);
+
+  @override
+  Future<List<Subject>> getSubjects() async => subjects;
+
+  @override
+  Stream<List<Subject>> watchSubjects() async* {
+    yield subjects;
+  }
+
+  @override
+  Future<Subject?> getSubjectById(String id) async =>
+      subjects.where((s) => s.id == id).firstOrNull;
+
+  @override
+  Stream<List<TimetableSlot>> watchAllSlots() async* {
+    yield [];
+  }
+
+  @override
+  Stream<List<TimetableSlot>> watchSlotsByDay(int dayOfWeek) async* {
+    yield [];
+  }
+
+  @override
+  Future<TimetableSlot?> getSlotById(String id) async => null;
+
+  @override
+  Future<void> saveSubject(Subject subject) async {}
+
+  @override
+  Future<void> softDeleteSubject(String id) async {}
+
+  @override
+  Future<void> saveSlots(List<TimetableSlot> slots) async {}
+
+  @override
+  Future<void> deleteSlot(String id) async {}
+
+  @override
+  Future<List<ExamSchedule>> getExams() async => [];
+
+  @override
+  Future<void> saveExams(List<ExamSchedule> exams) async {}
+
+  @override
+  Future<List<CampusBuilding>> getBuildings() async => [];
+
+  @override
+  Future<void> saveBuildings(List<CampusBuilding> buildings) async {}
+}
 
 void main() {
   late InMemoryNoteRepository repository;
@@ -248,6 +308,46 @@ void main() {
 
       expect(find.text('Thêm video'), findsOneWidget);
       expect(find.text(AppStrings.videoAttach), findsNothing);
+    });
+
+    testWidgets(
+        'picking a timetable subject in subject dialog saves subject.id and updates chip label',
+        (tester) async {
+      final dsaSubject = Subject(
+        id: 'subj_cs201',
+        code: 'CS201',
+        name: 'Cấu trúc dữ liệu & Giải thuật',
+        credits: 4,
+        colorArgb: 0xFF1E88E5,
+        createdAt: DateTime(2026, 10, 1),
+        updatedAt: DateTime(2026, 10, 1),
+      );
+      GetIt.instance.registerSingleton<TimetableRepository>(
+        _FakeTimetableRepository([dsaSubject]),
+      );
+
+      await tester.pumpWidget(buildTestHarness(noteId: 'test-note-pick-subj'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Chọn môn'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cấu trúc dữ liệu & Giải thuật'), findsOneWidget);
+      await tester.tap(find.text('Cấu trúc dữ liệu & Giải thuật'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('${AppStrings.pinnedSubject}: Cấu trúc dữ liệu & Giải thuật'),
+        findsOneWidget,
+      );
+
+      // Wait for debounce auto-save and verify subject.id (not name) was persisted
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      final saved = await repository.getNoteById('test-note-pick-subj');
+      expect(saved, isNotNull);
+      expect(saved!.subjectId, equals('subj_cs201'));
     });
   });
 }

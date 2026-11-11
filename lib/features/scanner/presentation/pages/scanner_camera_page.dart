@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/l10n/strings.dart';
 import '../../../../core/router/routes.dart';
+import '../../../../core/utils/media_permission_helper.dart';
 import '../bloc/scanner_bloc.dart';
 import '../bloc/scanner_event.dart';
 import '../bloc/scanner_state.dart';
@@ -31,11 +33,11 @@ class _ScannerCameraView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chụp ảnh bài giảng & OCR'),
+        title: const Text('Chụp ảnh bài giảng & Đọc chữ'),
         actions: [
           IconButton(
             icon: const Icon(Icons.document_scanner_outlined),
-            tooltip: 'Quét chữ AI (OCR)',
+            tooltip: 'Đọc chữ từ ảnh',
             onPressed: () => context.push(Routes.ocrScanner),
           ),
         ],
@@ -45,7 +47,35 @@ class _ScannerCameraView extends StatelessWidget {
   }
 
   Widget _buildCameraCaptureTab(BuildContext context) {
-    return BlocBuilder<ScannerBloc, ScannerState>(
+    return BlocConsumer<ScannerBloc, ScannerState>(
+      listenWhen: (prev, curr) =>
+          curr.errorMessage != null && curr.errorMessage != prev.errorMessage,
+      listener: (context, state) {
+        final msg = state.errorMessage;
+        if (msg == null) return;
+        final isCamDenied = !state.hasCameraPermission &&
+            (state.cameraPermission.isDenied ||
+                state.cameraPermission.isPermanentlyDenied ||
+                msg.contains('Camera'));
+        final isPermDenied = state.cameraPermission.isPermanentlyDenied;
+        context.read<ScannerBloc>().add(const ClearQrResult());
+        if (isCamDenied) {
+          () async {
+            final granted =
+                await MediaPermissionHelper.showCameraPermissionDialog(
+              context,
+              isPermanentlyDenied: isPermDenied,
+            );
+            if (granted && context.mounted) {
+              context.read<ScannerBloc>().add(const CapturePhotoRequested());
+            }
+          }();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+          );
+        }
+      },
       builder: (context, state) {
         return Column(
           children: [

@@ -59,9 +59,14 @@ class _PdfExportView extends StatelessWidget {
       builder: (context, state) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text(AppStrings.pdfExportTitle),
+            title: const Text(
+              AppStrings.pdfExportTitle,
+              style: TextStyle(fontSize: 18),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             actions: [
-              if (state is PdfExportLoaded) ...[
+              if (state is PdfExportLoaded && state.result.bytes.isNotEmpty) ...[
                 // Nút xoay khổ giấy
                 IconButton(
                   tooltip: state.orientation == PdfOrientation.portrait
@@ -160,79 +165,152 @@ class _PdfExportView extends StatelessWidget {
     }
 
     if (state is PdfExportLoaded) {
+      final hasPdfDocument = state.result.bytes.isNotEmpty;
+      final validSelectedNoteId =
+          state.availableNotes.any((n) => n.id == state.selectedNoteId)
+              ? state.selectedNoteId
+              : (state.availableNotes.isNotEmpty
+                  ? state.availableNotes.first.id
+                  : null);
+
       return Column(
         children: [
           // Bảng điều khiển chọn loại tài liệu
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            child: Column(
-              children: [
-                SegmentedButton<PdfExportType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: PdfExportType.timetable,
-                      icon: Icon(Icons.calendar_month_rounded),
-                      label: Text(AppStrings.exportTimetable),
+            child: MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.05,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<PdfExportType>(
+                    showSelectedIcon: false,
+                    style: SegmentedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    ButtonSegment(
-                      value: PdfExportType.note,
-                      icon: Icon(Icons.menu_book_rounded),
-                      label: Text(AppStrings.exportNotes),
-                    ),
-                  ],
-                  selected: {state.exportType},
-                  onSelectionChanged: (newSelection) {
-                    context.read<PdfExportBloc>().add(ChangePdfTypeEvent(newSelection.first));
-                  },
-                ),
-                // Nếu đang ở chế độ xuất ghi chú và có nhiều ghi chú
-                if (state.exportType == PdfExportType.note && state.availableNotes.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: state.selectedNoteId,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      labelText: 'Chọn bài giảng muốn xuất',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: state.availableNotes.map((note) {
-                      return DropdownMenuItem(
-                        value: note.id,
-                        child: Text(
-                          note.title,
+                    segments: const [
+                      ButtonSegment(
+                        value: PdfExportType.timetable,
+                        icon: Icon(Icons.calendar_month_rounded, size: 16),
+                        label: Text(
+                          AppStrings.exportTimetable,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (noteId) {
-                      if (noteId != null) {
-                        context.read<PdfExportBloc>().add(SelectNoteForExportEvent(noteId));
-                      }
+                      ),
+                      ButtonSegment(
+                        value: PdfExportType.note,
+                        icon: Icon(Icons.menu_book_rounded, size: 16),
+                        label: Text(
+                          AppStrings.exportNotes,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                    selected: {state.exportType},
+                    onSelectionChanged: (newSelection) {
+                      context.read<PdfExportBloc>().add(ChangePdfTypeEvent(newSelection.first));
                     },
                   ),
+                  // Nếu đang ở chế độ xuất ghi chú và có ghi chú
+                  if (state.exportType == PdfExportType.note && state.availableNotes.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(validSelectedNoteId),
+                      initialValue: validSelectedNoteId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        labelText: 'Chọn bài giảng muốn xuất',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: state.availableNotes.map((note) {
+                        final noteTitle = note.title.trim().isNotEmpty
+                            ? note.title
+                            : AppStrings.untitledNote;
+                        return DropdownMenuItem(
+                          value: note.id,
+                          child: Text(
+                            noteTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (noteId) {
+                        if (noteId != null) {
+                          context.read<PdfExportBloc>().add(SelectNoteForExportEvent(noteId));
+                        }
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
 
-          // Vùng hiển thị xem trước PDF tương tác (Printing PdfPreview)
+          // Vùng hiển thị xem trước PDF tương tác hoặc trạng thái chưa có ghi chú
           Expanded(
-            child: PdfPreview(
-              build: (format) async => state.result.bytes,
-              canChangePageFormat: false,
-              canChangeOrientation: false,
-              canDebug: false,
-              scrollViewDecoration: const BoxDecoration(color: Colors.black12),
-              pdfFileName: state.exportType == PdfExportType.timetable
-                  ? 'StudySnap_ThoiKhoaBieu.pdf'
-                  : 'StudySnap_GhiChu.pdf',
-            ),
+            child: !hasPdfDocument && state.exportType == PdfExportType.note
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.note_alt_outlined,
+                            size: 56,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Chưa có ghi chú bài giảng nào để xuất PDF',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Hãy tạo một ghi chú trong tab Ghi chú hoặc từ công cụ Chụp ảnh / Bảng vẽ trước khi xuất PDF.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : PdfPreview(
+                    build: (format) async => state.result.bytes,
+                    canChangePageFormat: false,
+                    canChangeOrientation: false,
+                    canDebug: false,
+                    scrollViewDecoration: const BoxDecoration(color: Colors.black12),
+                    pdfFileName: state.exportType == PdfExportType.timetable
+                        ? 'StudySnap_ThoiKhoaBieu.pdf'
+                        : 'StudySnap_GhiChu.pdf',
+                  ),
           ),
 
           // Thanh hiển thị chỉ số hiệu năng (NFR Benchmark)
-          _buildBenchmarkBanner(state.result),
+          if (hasPdfDocument)
+            SafeArea(
+              top: false,
+              child: _buildBenchmarkBanner(state.result),
+            ),
         ],
       );
     }

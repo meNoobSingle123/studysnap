@@ -5,6 +5,7 @@
 
     <!-- Camera: image_picker (Chụp ảnh bài giảng & OCR) -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Định vị GPS: geolocator (Gắn vị trí phòng học & ghi chú) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -103,6 +104,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Camera capture intent -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
     </queries>
 </manifest>

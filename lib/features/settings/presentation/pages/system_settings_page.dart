@@ -2,13 +2,16 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/router/routes.dart';
 import '../../../../core/security/auth_lock_listenable.dart';
+import '../../../../core/security/biometric_lock_helper.dart';
 import '../../../../core/security/key_storage_service.dart';
+import '../../../../core/utils/media_permission_helper.dart';
 import '../../../ai_assistant/data/datasources/gemini_remote_datasource.dart';
 import '../../../timetable/data/datasources/timetable_local_datasource.dart';
 
@@ -17,12 +20,14 @@ class SystemSettingsPage extends StatefulWidget {
   final KeyStorageService? keyStorageService;
   final GeminiRemoteDataSource? geminiRemoteDataSource;
   final TimetableLocalDataSource? timetableLocalDataSource;
+  final LocalAuthentication? localAuth;
 
   const SystemSettingsPage({
     super.key,
     this.keyStorageService,
     this.geminiRemoteDataSource,
     this.timetableLocalDataSource,
+    this.localAuth,
   });
 
   @override
@@ -33,6 +38,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
   late final KeyStorageService _keyStorage;
   late final GeminiRemoteDataSource _geminiDataSource;
   late final TimetableLocalDataSource _timetableDataSource;
+  late final LocalAuthentication _localAuth;
 
   String? _savedApiKey;
   bool _isLoadingKey = true;
@@ -40,6 +46,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
   bool _isClearingCache = false;
   bool _isResettingData = false;
   bool _isLockEnabled = false;
+  bool _isCameraGranted = false;
 
   @override
   void initState() {
@@ -61,18 +68,55 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         (getIt.isRegistered<TimetableLocalDataSource>()
             ? getIt<TimetableLocalDataSource>()
             : TimetableLocalDataSourceImpl(keyStorageService: _keyStorage));
+    _localAuth = widget.localAuth ??
+        (getIt.isRegistered<LocalAuthentication>()
+            ? getIt<LocalAuthentication>()
+            : LocalAuthentication());
 
     _isLockEnabled = AuthLockListenable.instance.isLockEnabled;
     _loadInitialState();
   }
 
+  Future<void> _toggleSecurityLock(bool value) async {
+    final result = await BiometricLockHelper.toggleLock(
+      context: context,
+      targetValue: value,
+      keyStorage: _keyStorage,
+      localAuth: _localAuth,
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _isLockEnabled = result;
+      });
+    }
+  }
+
+  Future<void> _requestCameraFromSettings() async {
+    final granted = await MediaPermissionHelper.ensureCameraPermission(context);
+    if (mounted) {
+      setState(() {
+        _isCameraGranted = granted;
+      });
+      if (granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã cấp quyền Camera cho StudySnap.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _loadInitialState() async {
     final apiKey = await _keyStorage.getGeminiApiKey();
     final lockEnabled = await _keyStorage.isLockEnabled();
+    final camGranted = await MediaPermissionHelper.isCameraGranted();
     if (mounted) {
       setState(() {
         _savedApiKey = apiKey;
         _isLockEnabled = lockEnabled;
+        _isCameraGranted = camGranted;
         _isLoadingKey = false;
       });
     }
@@ -106,7 +150,12 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                     child: const Icon(Icons.key_rounded, color: Color(0xFF5E48E8), size: 22),
                   ),
                   const SizedBox(width: 10),
-                  const Text('Khóa Google Gemini API', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Expanded(
+                    child: Text(
+                      'Khóa Google Gemini API',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ],
               ),
               content: SingleChildScrollView(
@@ -310,11 +359,16 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
             SizedBox(width: 10),
-            Text('Khôi phục dữ liệu gốc?'),
+            Expanded(
+              child: Text(
+                'Khôi phục dữ liệu gốc?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: const Text(
-          'Hành động này sẽ thiết lập lại danh sách môn học và thời khóa biểu về trạng thái mẫu ban đầu.\n\nBạn có muốn tiếp tục?',
+          'Hành động này chỉ khôi phục lại danh sách môn học và thời khóa biểu mẫu ban đầu (không xóa các ghi chú bạn đã tạo).\n\nBạn có muốn tiếp tục?',
         ),
         actions: [
           TextButton(
@@ -341,6 +395,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
 
       try {
         await _timetableDataSource.init();
+        await _timetableDataSource.seedMockData(force: true);
         if (mounted) {
           messenger.showSnackBar(
             const SnackBar(
@@ -386,7 +441,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Nhật ký cập nhật', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text('StudySnap v1.1.0 • Build 2026', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('StudySnap v1.1.2 • Bản dựng 4', style: TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
@@ -415,7 +470,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                     SizedBox(height: 6),
                     Text('• 🤖 Trợ lý AI Gemini: Tích hợp gemini-2.0-flash tốc độ cao, tóm tắt bài giảng & trắc nghiệm kiểm tra kiến thức.'),
                     SizedBox(height: 6),
-                    Text('• 📝 Ghi chú & Bảng vẽ: Canvas đa màu sắc, nhận diện ký tự quang học OCR cục bộ không cần mạng.'),
+                    Text('• 📝 Ghi chú & Bảng vẽ: Canvas đa màu sắc, đọc chữ từ ảnh cục bộ không cần mạng.'),
                     SizedBox(height: 6),
                     Text('• 🔒 Bảo mật: Mã hóa dữ liệu cục bộ chuẩn AES-256 trên nền Hive CE.'),
                   ],
@@ -447,12 +502,14 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         children: [
           Icon(icon, size: 16, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
-          Text(
-            title,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ],
@@ -471,7 +528,12 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         centerTitle: true,
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.paddingOf(context).bottom + 32,
+        ),
         children: [
           // ── 1. Cấu hình Gemini AI ──────────────────────────────────────
           _buildSectionHeader('TRÍ TUỆ NHÂN TẠO (AI GEMINI)', Icons.auto_awesome_rounded),
@@ -592,23 +654,6 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.lock_clock_rounded, color: Colors.teal),
-                  title: const Text('Cơ sở dữ liệu Hive CE'),
-                  subtitle: const Text('Mã hóa an toàn phần cứng chuẩn AES-256'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'AES-256',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal),
-                    ),
-                  ),
-                ),
-                Divider(height: 1, indent: 64, color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
-                ListTile(
                   leading: const Icon(Icons.cleaning_services_rounded, color: Colors.blueGrey),
                   title: const Text('Dọn dẹp bộ nhớ đệm (Cache)'),
                   subtitle: const Text('Giải phóng các file ảnh và dữ liệu xử lý tạm'),
@@ -672,11 +717,45 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                 ),
                 Divider(height: 1, indent: 64, color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
                 ListTile(
-                  leading: const Icon(Icons.fingerprint_rounded, color: Colors.deepPurple),
+                  leading: Icon(
+                    Icons.camera_alt_outlined,
+                    color: _isCameraGranted ? Colors.teal : Colors.deepOrange,
+                  ),
+                  title: const Text('Quyền truy cập Camera'),
+                  subtitle: Text(
+                    _isCameraGranted
+                        ? 'Đã cấp quyền chụp bài giảng & đọc chữ từ ảnh'
+                        : 'Chưa cấp quyền — chạm để bật Camera',
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (_isCameraGranted ? Colors.teal : Colors.deepOrange)
+                          .withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _isCameraGranted ? 'Đã bật' : 'Cấp quyền',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _isCameraGranted ? Colors.teal : Colors.deepOrange,
+                      ),
+                    ),
+                  ),
+                  onTap: _requestCameraFromSettings,
+                ),
+                Divider(height: 1, indent: 64, color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
+                SwitchListTile(
+                  secondary: const Icon(Icons.fingerprint_rounded, color: Colors.deepPurple),
                   title: const Text('Khóa bảo mật ứng dụng'),
-                  subtitle: Text(_isLockEnabled ? 'Đang kích hoạt' : 'Đang tắt'),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.push(Routes.tools),
+                  subtitle: Text(
+                    _isLockEnabled
+                        ? 'Đang kích hoạt (vân tay / mật khẩu máy)'
+                        : 'Đang tắt — chạm để bật bảo vệ ứng dụng',
+                  ),
+                  value: _isLockEnabled,
+                  onChanged: _toggleSecurityLock,
                 ),
               ],
             ),
@@ -705,7 +784,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                     child: const Icon(Icons.school_rounded, color: Colors.white, size: 22),
                   ),
                   title: const Text('StudySnap', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Phiên bản v1.1.0 • Bản dựng 2026'),
+                  subtitle: const Text('Phiên bản v1.1.2 • Bản dựng 4'),
                 ),
                 Divider(height: 1, indent: 64, color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
                 ListTile(

@@ -3,6 +3,7 @@ import 'package:nhom_7/features/notes/data/repositories/in_memory_note_repositor
 import 'package:nhom_7/features/notes/domain/entities/lecture_note.dart';
 import 'package:nhom_7/features/notes/domain/usecases/delete_note_usecase.dart';
 import 'package:nhom_7/features/notes/domain/usecases/watch_all_notes_usecase.dart';
+import 'package:nhom_7/features/notes/domain/utils/note_filter_helper.dart';
 import 'package:nhom_7/features/notes/presentation/bloc/note_list_bloc.dart';
 import 'package:nhom_7/features/notes/presentation/bloc/note_list_event.dart';
 import 'package:nhom_7/features/notes/presentation/bloc/note_list_state.dart';
@@ -324,6 +325,99 @@ void main() {
             return state.subjectsMap.containsKey('sub_new') &&
                 state.subjectsMap['sub_new']?.name == 'Trí tuệ nhân tạo nâng cao';
           }),
+        ),
+      );
+    });
+
+    test('SearchQueryChanged supports unaccented Vietnamese and subject name/code', () async {
+      bloc.add(const SearchQueryChanged('tang toc'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) =>
+              state.filteredNotes.length == 1 &&
+              state.filteredNotes.first.id == 'note_2'),
+        ),
+      );
+
+      // Search by unaccented subject name
+      bloc.add(const SearchQueryChanged('thiet bi di dong'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) =>
+              state.filteredNotes.length == 2 &&
+              state.filteredNotes.every((n) => n.subjectId == 'sub_flutter')),
+        ),
+      );
+
+      // Search by subject code
+      bloc.add(const SearchQueryChanged('IT3020'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) =>
+              state.filteredNotes.length == 1 &&
+              state.filteredNotes.first.id == 'note_2'),
+        ),
+      );
+    });
+
+    test('FilterSubjectChanged matches legacy notes saved with subject name and general notes', () async {
+      final legacyNote = LectureNote(
+        id: 'note_legacy_name',
+        subjectId: 'Cơ sở dữ liệu',
+        title: 'Ghi chú cũ lưu theo tên môn',
+        bodyText: 'SQL và quan hệ',
+        createdAt: date2,
+        updatedAt: date2,
+      );
+      final generalNote = LectureNote(
+        id: 'note_general',
+        subjectId: 'general',
+        title: 'Ghi chú tự do',
+        bodyText: 'Việc cần làm',
+        createdAt: date3,
+        updatedAt: date3,
+      );
+      await noteRepository.saveNote(legacyNote);
+      await noteRepository.saveNote(generalNote);
+
+      // Wait until stream delivers all 5 notes
+      await bloc.stream.firstWhere((s) => s.allNotes.length == 5);
+
+      // Selecting sub_db should match both note_2 (id: sub_db) and legacyNote (subjectId: 'Cơ sở dữ liệu')
+      bloc.add(const FilterSubjectChanged('sub_db'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) {
+            final ids = state.filteredNotes.map((n) => n.id).toSet();
+            return state.selectedSubjectId == 'sub_db' &&
+                ids.length == 2 &&
+                ids.containsAll(['note_2', 'note_legacy_name']);
+          }),
+        ),
+      );
+
+      // Selecting general sentinel should match note_general
+      bloc.add(const FilterSubjectChanged(NoteFilterHelper.generalSubjectFilterId));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) =>
+              state.filteredNotes.length == 1 &&
+              state.filteredNotes.first.id == 'note_general'),
+        ),
+      );
+
+      // Tapping All Subjects (null) resets filter to all 5 notes
+      bloc.add(const FilterSubjectChanged(null));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<NoteListState>((state) =>
+              state.selectedSubjectId == null && state.filteredNotes.length == 5),
         ),
       );
     });

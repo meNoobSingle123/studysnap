@@ -174,6 +174,65 @@ void main() {
         throwsA(isA<ServerException>()),
       );
     });
+
+    test('uses custom serverUrl root and appends /v1/timetable', () async {
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          'http://192.168.1.10:3000/v1/timetable',
+          queryParameters: {'termId': '2026-1'},
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions:
+              RequestOptions(path: 'http://192.168.1.10:3000/v1/timetable'),
+          data: dummyTimetableResponse,
+          statusCode: 200,
+        ),
+      );
+
+      final result = await remoteDataSource.getTimetable(
+        '2026-1',
+        serverUrl: 'http://192.168.1.10:3000/',
+      );
+
+      expect(result, equals(dummyTimetableResponse));
+    });
+
+    test('falls back to plain text JSON decoding when endpoint returns text/plain',
+        () async {
+      const jsonUrl = 'https://example.com/schedule.json';
+      when(
+        () => mockDio.get<Map<String, dynamic>>(
+          jsonUrl,
+          queryParameters: null,
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(TypeError());
+
+      when(
+        () => mockDio.get<String>(
+          jsonUrl,
+          queryParameters: null,
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: jsonUrl),
+          data: '{"termId":"2026-1","subjects":[],"slots":[]}',
+          statusCode: 200,
+        ),
+      );
+
+      final result = await remoteDataSource.getTimetable(
+        '2026-1',
+        serverUrl: jsonUrl,
+      );
+
+      expect(result['termId'], equals('2026-1'));
+      expect(result['subjects'], isEmpty);
+      expect(result['slots'], isEmpty);
+    });
   });
 
   group('getExams', () {

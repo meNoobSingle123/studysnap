@@ -105,7 +105,7 @@ class HiveNoteRepository implements NoteRepository {
 
     return LectureNote(
       id: data['id'] as String? ?? '',
-      subjectId: data['subjectId'] as String? ?? 'sub_flutter',
+      subjectId: data['subjectId'] as String? ?? 'general',
       slotId: data['slotId'] as String?,
       title: data['title'] as String? ?? '',
       bodyText: data['bodyText'] as String? ?? '',

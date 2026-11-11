@@ -71,24 +71,26 @@ class CalculateGpaUseCase {
     final neededPoints = totalPointsNeeded - currentPoints;
     final requiredGpa = neededPoints / remainingCredits;
 
-    // 3. Phân loại kết quả theo đặc tả mục 7.2
-    if (requiredGpa > 4.0) {
+    // 3. Phân loại kết quả theo đặc tả mục 7.2 (tránh sai số dấu phẩy động IEEE-754)
+    const double eps = 1e-9;
+    if (requiredGpa > 4.0 + eps) {
       return GpaProjectionResult(
         requiredGpa: requiredGpa,
         status: GpaProjectionStatus.impossible,
         message: 'Không khả thi',
       );
-    } else if (requiredGpa <= 0.0) {
+    } else if (requiredGpa <= eps) {
       return const GpaProjectionResult(
         requiredGpa: 0.0,
         status: GpaProjectionStatus.alreadyAchieved,
         message: 'Đã đạt mục tiêu',
       );
     } else {
+      final rounded = double.parse(requiredGpa.toStringAsFixed(2)).clamp(0.0, 4.0);
       return GpaProjectionResult(
-        requiredGpa: double.parse(requiredGpa.toStringAsFixed(2)),
+        requiredGpa: rounded,
         status: GpaProjectionStatus.achievable,
-        message: 'Cần đạt: ${requiredGpa.toStringAsFixed(2)} / 4.0',
+        message: 'Cần đạt: ${rounded.toStringAsFixed(2)} / 4.0',
       );
     }
   }

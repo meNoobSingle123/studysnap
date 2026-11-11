@@ -122,10 +122,14 @@ class QuickStudyCard extends StatelessWidget {
                     color: colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    'Phòng ${slot.room.isNotEmpty ? slot.room : 'Chưa xếp'}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  Flexible(
+                    child: Text(
+                      'Phòng ${slot.room.isNotEmpty ? slot.room : 'Chưa xếp'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   if (slot.buildingId != null &&
@@ -137,10 +141,14 @@ class QuickStudyCard extends StatelessWidget {
                       color: colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      'Tòa ${slot.buildingId}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                    Flexible(
+                      child: Text(
+                        'Tòa ${slot.buildingId}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
@@ -198,7 +206,7 @@ class QuickStudyCard extends StatelessWidget {
                         context.push(Routes.ocrScanner);
                       },
                       icon: const Icon(Icons.document_scanner_outlined, size: 16),
-                      label: const Text('Quét bảng OCR', style: TextStyle(fontSize: 12)),
+                      label: const Text('Đọc chữ từ ảnh', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],

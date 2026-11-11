@@ -239,5 +239,68 @@ void main() {
       expect(savedRoom, equals('H2.304'));
       expect(savedRepeatWeeks, equals(5));
     });
+
+    testWidgets(
+        'recurring multi-weekday chips pass sorted selected weekdays to onSaveRecurring',
+        (tester) async {
+      List<int>? savedWeekdays;
+      int? savedWeeks;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AddSlotBottomSheet(
+              initialDate: DateTime(2026, 10, 16), // Friday (weekday 5)
+              onSave: ({
+                required String subjectName,
+                required String room,
+                String? building,
+                required DateTime startDate,
+                required TimeOfDay startTime,
+                required TimeOfDay endTime,
+                required int repeatWeeks,
+              }) async {},
+              onSaveRecurring: ({
+                required String subjectName,
+                required String room,
+                String? building,
+                required DateTime startDate,
+                required TimeOfDay startTime,
+                required TimeOfDay endTime,
+                required int repeatWeeks,
+                required List<int> repeatWeekdays,
+              }) async {
+                savedWeeks = repeatWeeks;
+                savedWeekdays = repeatWeekdays;
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('add_slot_subject_field')),
+        'Tiếng Anh chuyên ngành',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const ValueKey('add_slot_repeat_switch')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add_slot_repeat_switch')));
+      await tester.pumpAndSettle();
+
+      // Add T2 (1) and T4 (3) alongside initial T6 (5)
+      await tester.tap(find.byKey(const ValueKey('add_slot_weekday_chip_1')));
+      await tester.tap(find.byKey(const ValueKey('add_slot_weekday_chip_3')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const ValueKey('add_slot_submit_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add_slot_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(savedWeeks, equals(5));
+      expect(savedWeekdays, equals([1, 3, 5]));
+    });
   });
 }

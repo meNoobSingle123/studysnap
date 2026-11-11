@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/lecture_note.dart';
 import '../../domain/usecases/delete_note_usecase.dart';
 import '../../domain/usecases/watch_all_notes_usecase.dart';
+import '../../domain/utils/note_filter_helper.dart';
 import '../../../timetable/domain/entities/subject.dart';
 import '../../../timetable/domain/usecases/get_subjects_usecase.dart';
 import 'note_list_event.dart';
@@ -38,11 +39,24 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
     LoadNotesStarted event,
     Emitter<NoteListState> emit,
   ) async {
-    emit(state.copyWith(status: NoteListStatus.loading));
+    if (state.status == NoteListStatus.initial) {
+      emit(state.copyWith(status: NoteListStatus.loading));
+    }
     try {
       final subjects = await getSubjectsUseCase.getSubjects();
       final subjectsMap = {for (final s in subjects) s.id: s};
-      emit(state.copyWith(subjectsMap: subjectsMap));
+      final filtered = filterAndSortNotes(
+        notes: state.allNotes,
+        query: state.searchQuery,
+        selectedSubjectId: state.selectedSubjectId,
+        selectedDate: state.selectedDate,
+        sortOption: state.sortOption,
+        subjectsMap: subjectsMap,
+      );
+      emit(state.copyWith(
+        subjectsMap: subjectsMap,
+        filteredNotes: filtered,
+      ));
 
       await _subjectsSubscription?.cancel();
       _subjectsSubscription = getSubjectsUseCase.watchSubjects().listen(
@@ -89,6 +103,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: state.selectedSubjectId,
       selectedDate: state.selectedDate,
       sortOption: state.sortOption,
+      subjectsMap: state.subjectsMap,
     );
     emit(state.copyWith(
       status: NoteListStatus.success,
@@ -108,6 +123,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: state.selectedSubjectId,
       selectedDate: state.selectedDate,
       sortOption: state.sortOption,
+      subjectsMap: subjectsMap,
     );
     emit(state.copyWith(
       subjectsMap: subjectsMap,
@@ -125,6 +141,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: state.selectedSubjectId,
       selectedDate: state.selectedDate,
       sortOption: state.sortOption,
+      subjectsMap: state.subjectsMap,
     );
     emit(state.copyWith(
       searchQuery: event.query,
@@ -146,6 +163,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: newSubjectId,
       selectedDate: state.selectedDate,
       sortOption: state.sortOption,
+      subjectsMap: state.subjectsMap,
     );
     emit(state.copyWith(
       selectedSubjectId: () => newSubjectId,
@@ -163,6 +181,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: state.selectedSubjectId,
       selectedDate: event.date,
       sortOption: state.sortOption,
+      subjectsMap: state.subjectsMap,
     );
     emit(state.copyWith(
       selectedDate: () => event.date,
@@ -180,6 +199,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: state.selectedSubjectId,
       selectedDate: state.selectedDate,
       sortOption: event.sortOption,
+      subjectsMap: state.subjectsMap,
     );
     emit(state.copyWith(
       sortOption: event.sortOption,
@@ -208,6 +228,7 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
       selectedSubjectId: null,
       selectedDate: null,
       sortOption: state.sortOption,
+      subjectsMap: state.subjectsMap,
     );
     emit(state.copyWith(
       searchQuery: '',
@@ -217,6 +238,9 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
     ));
   }
 
+  static bool _isSameCalendarDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   /// Pure filtering and sorting function for in-memory note management.
   static List<LectureNote> filterAndSortNotes({
     required List<LectureNote> notes,
@@ -224,31 +248,60 @@ class NoteListBloc extends Bloc<NoteListEvent, NoteListState> {
     required String? selectedSubjectId,
     required DateTime? selectedDate,
     required NoteSortOption sortOption,
+    Map<String, Subject> subjectsMap = const {},
   }) {
-    final cleanQuery = query.trim().toLowerCase();
+    final cleanQuery = query.trim();
 
     final result = notes.where((note) {
-      // 1. Filter by subject
-      if (selectedSubjectId != null && note.subjectId != selectedSubjectId) {
-        return false;
+      final resolvedSubject =
+          NoteFilterHelper.resolveSubject(note.subjectId, subjectsMap);
+
+      // 1. Filter by subject (supports UUID id, legacy subject name, general, or custom string)
+      if (selectedSubjectId != null) {
+        if (selectedSubjectId == NoteFilterHelper.generalSubjectFilterId) {
+          if (!NoteFilterHelper.isGeneralSubjectId(note.subjectId)) {
+            return false;
+          }
+        } else {
+          final directMatch = note.subjectId == selectedSubjectId;
+          final resolvedMatch = resolvedSubject?.id == selectedSubjectId;
+          final customMatch = note.subjectId.trim().toLowerCase() ==
+              selectedSubjectId.trim().toLowerCase();
+          if (!directMatch && !resolvedMatch && !customMatch) {
+            return false;
+          }
+        }
       }
 
-      // 2. Filter by date (compare year-month-day with note.createdAt)
+      // 2. Filter by date (matches either creation day or displayed updatedAt day)
       if (selectedDate != null) {
-        final d = note.createdAt;
-        final matchesDate = d.year == selectedDate.year &&
-            d.month == selectedDate.month &&
-            d.day == selectedDate.day;
+        final matchesDate = _isSameCalendarDay(note.createdAt, selectedDate) ||
+            _isSameCalendarDay(note.updatedAt, selectedDate);
         if (!matchesDate) {
           return false;
         }
       }
 
-      // 3. Filter by search query (case-insensitive in title or bodyText)
+      // 3. Filter by search query (title, bodyText, subject name/code, location)
       if (cleanQuery.isNotEmpty) {
-        final titleMatch = note.title.toLowerCase().contains(cleanQuery);
-        final bodyMatch = note.bodyText.toLowerCase().contains(cleanQuery);
-        if (!titleMatch && !bodyMatch) {
+        final customSubjectText = (resolvedSubject == null &&
+                !NoteFilterHelper.isGeneralSubjectId(note.subjectId))
+            ? note.subjectId
+            : '';
+        final searchableFields = [
+          note.title,
+          note.bodyText,
+          resolvedSubject?.name ?? '',
+          resolvedSubject?.code ?? '',
+          customSubjectText,
+          note.location ?? '',
+        ];
+        final anyMatch = searchableFields.any(
+          (field) =>
+              field.isNotEmpty &&
+              NoteFilterHelper.matchesQuery(field, cleanQuery),
+        );
+        if (!anyMatch) {
           return false;
         }
       }
